@@ -1,4 +1,4 @@
-name: CLIC_Pflow_Full
+name: &name CLIC_Pflow_FullDice
 seed_everything: 42
 
 data:
@@ -52,7 +52,8 @@ trainer:
   logger:
     class_path: lightning.pytorch.loggers.CometLogger
     init_args:
-      project_name: clic
+      project: clic
+      experiment_name: *name
 
   callbacks:
     - class_path: hepattn.callbacks.InferenceTimer
@@ -62,13 +63,13 @@ trainer:
         monitor: val/loss
         save_last: true
         # every_n_train_steps: 1000
-    - class_path: hepattn.callbacks.PredictionWriter
-      init_args:
-        write_inputs: true
-        write_outputs: true
-        write_preds: true
-        write_targets: true
-        write_losses: false
+    - class_path: hepattn.experiments.clic.PflowPredictionWriter
+      # init_args:
+      #   write_inputs: true
+      #   write_outputs: true
+      #   write_preds: true
+      #   write_targets: true
+      #   write_losses: false
     - class_path: lightning.pytorch.callbacks.ModelSummary
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
     - class_path: lightning.pytorch.callbacks.TQDMProgressBar
@@ -175,11 +176,11 @@ model:
                 logit_scale: 4
                 losses:
                   mask_ce: 5.0
-                  # mask_dice: 1
+                  mask_dice: 1
                   # mask_focal: 2
                 costs:
                   mask_ce: 5.0
-                  # mask_dice: 1
+                  mask_dice: 1
                   # mask_focal: 2
                 dim: *dim
                 null_weight: 1.0
