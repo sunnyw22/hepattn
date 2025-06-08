@@ -498,9 +498,9 @@ model:
                 output_object: flow
                 target_object: particle
                 losses:
-                  object_ce: 0.1
+                  object_bce: 0.1
                 costs:
-                  object_ce: 10.0
+                  object_bce: 10.0
                 dim: *dim
                 null_weight: 1.0
                 mask_queries: false
