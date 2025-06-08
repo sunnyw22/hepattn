@@ -18,6 +18,7 @@ class MaskFormer(nn.Module):
         input_sort_field: str | None = None,
         use_attn_masks: bool = True,
         use_query_masks: bool = True,
+        raw_variables: list[str] | None = None,
     ):
         """
         Initializes the MaskFormer model, which is a modular transformer-style architecture designed
@@ -43,6 +44,8 @@ class MaskFormer(nn.Module):
             The dimensionality of the query and key embeddings.
         input_sort_field : str or None, optional
             An optional key used to sort the input objects (e.g., for windowed attention).
+        raw_variables : list[str] or None, optional
+            A list of variable names that passed to tasks without embedding.
         """
         super().__init__()
 
@@ -52,10 +55,12 @@ class MaskFormer(nn.Module):
         self.tasks = tasks
         self.matcher = matcher
         self.num_queries = num_queries
-        self.query_initial = nn.Parameter(torch.randn(num_queries, dim))
+        self.query_initial = nn.Parameter(torch.empty((num_queries, dim)))
+        nn.init.normal_(self.query_initial)
         self.input_sort_field = input_sort_field
         self.use_attn_masks = use_attn_masks
         self.use_query_masks = use_query_masks
+        self.raw_variables = raw_variables or []
 
     def forward(self, inputs: dict[str, Tensor]) -> dict[str, Tensor]:
         # Atomic input names
@@ -65,6 +70,11 @@ class MaskFormer(nn.Module):
         assert "query" not in input_names, "'query' input name is reserved."
 
         x = {}
+
+        for raw_var in self.raw_variables:
+            # If the raw variable is present in the inputs, add it directly to the output
+            if raw_var in inputs:
+                x[raw_var] = inputs[raw_var]
 
         # Embed the input objects
         for input_net in self.input_nets:
@@ -116,7 +126,12 @@ class MaskFormer(nn.Module):
             for task in self.tasks:
                 # Get the outputs of the task given the current embeddings and record them
                 task_outputs = task(x)
-
+                if task.name == "incidence":
+                    # Assume that the incidence task has only one output
+                    x["incidence"] = task_outputs[task.outputs[0]].detach()
+                if task.name == "classification":
+                    # Assume that the classification task has only one output
+                    x["class_probs"] = task_outputs[task.outputs[0]].detach()
                 outputs[f"layer_{layer_index}"][task.name] = task_outputs
 
                 # Here we check if each task has an attention mask to contribute, then after
@@ -205,6 +220,9 @@ class MaskFormer(nn.Module):
             layer_costs = None
             # Get the cost contribution from each of the tasks
             for task in self.tasks:
+                if task.do_inter_loss == False and layer_name != "final":
+                    # Skip tasks that do not contribute to the intermediate loss
+                    continue
                 # Only use the cost from the final set of predictions
                 task_costs = task.cost(layer_outputs[task.name], targets)
 
@@ -233,6 +251,9 @@ class MaskFormer(nn.Module):
         for layer_name in outputs:
             losses[layer_name] = {}
             for task in self.tasks:
+                if task.do_inter_loss == False and layer_name != "final":
+                    # Skip tasks that do not contribute to the intermediate loss
+                    continue
                 losses[layer_name][task.name] = task.loss(outputs[layer_name][task.name], targets)
 
         return losses

@@ -10,7 +10,7 @@ from hepattn.models.attention import Attention
 from hepattn.models.dense import Dense
 from hepattn.models.norm import LayerNorm
 
-create_block_mask = torch.compile(create_block_mask, dynamic=True)
+# create_block_mask = torch.compile(create_block_mask, dynamic=True)
 
 SCORE_MODS = {
     "relative_position": relative_position,
@@ -52,7 +52,7 @@ class Residual(nn.Module):
         self,
         fn: nn.Module,
         dim: int,
-        norm: str | None,
+        norm: str | None = None,
         post_norm: bool = False,
         layer_scale: float | None = None,
         drop_path: float = 0.0,
@@ -81,7 +81,9 @@ class Residual(nn.Module):
         if isinstance(norm, str):
             self.norm = getattr(nn, norm)(dim, elementwise_affine=False)
         elif norm is None:
-            self.norm = nn.Identity()
+            self.norm = nn.LayerNorm(dim, elementwise_affine=False)
+        elif issubclass(norm, LayerNorm):
+            self.norm = norm(dim)
         else:
             # TODO: Find whatever is passing type args instead of str
             self.norm = LayerNorm(dim)
