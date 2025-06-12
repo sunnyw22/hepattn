@@ -23,12 +23,12 @@ def load_convert_h5(filepath):
         #     class_probs_vars = [f"class_probs_{i}" for i in range(6)]
         #     pflow_class_probs = s2u(f["object_class"].fields(class_probs_vars)[:])
         #     pflow_class = np.argmax(pflow_class_probs, axis=-1)
-        pflow_class = f['object_class']['pflow_class'][:]
+        pflow_class = f["object_class"]["pflow_class"][:]
 
-        pflow_vars = [f'pred_{el}' for el in ["e", "pt", "eta", "sinphi", "cosphi"]]
-        proxy_vars = [f'proxy_{el}' for el in ["e", "pt", "eta", "sinphi", "cosphi"]]
-        pflow_data = s2u(f['regression'].fields(pflow_vars)[:])
-        proxy_data = s2u(f['regression'].fields(proxy_vars)[:])
+        pflow_vars = [f"pred_{el}" for el in ["e", "pt", "eta", "sinphi", "cosphi"]]
+        proxy_vars = [f"proxy_{el}" for el in ["e", "pt", "eta", "sinphi", "cosphi"]]
+        pflow_data = s2u(f["regression"].fields(pflow_vars)[:])
+        proxy_data = s2u(f["regression"].fields(proxy_vars)[:])
 
         pflow_ptetaphi = np.stack(
             [
@@ -55,7 +55,7 @@ def load_convert_h5(filepath):
         neutral_mask = (pflow_class < 5) & (pflow_class > 2)
         pflow_ptetaphi[neutral_mask][..., 0] = pflow_data[neutral_mask][..., 0] / np.cosh(pflow_ptetaphi[neutral_mask][..., 1])
 
-        event_number = f['events']["event_number"][:]
+        event_number = f["events"]["event_number"][:]
 
         return (
             event_number,
@@ -64,6 +64,7 @@ def load_convert_h5(filepath):
             proxy_ptetaphi,
             pflow_indicator,
         )
+
 
 class PflowPredictionWriter(Callback):
     def __init__(self) -> None:
@@ -130,13 +131,13 @@ class PflowPredictionWriter(Callback):
     def on_test_batch_end(self, trainer, module, test_step_outputs, batch, batch_idx):  # noqa: ARG002
         inputs, targets = batch
         outputs, preds, losses = test_step_outputs
-        outputs = outputs['final']
-        preds = preds['final']
+        outputs = outputs["final"]
+        preds = preds["final"]
         to_write = {}
         # Event numbers
         to_write["events"] = {
-            'event_number': u2s(
-                targets['event_number'].cpu().numpy().astype(np.int64).reshape(-1, 1),
+            "event_number": u2s(
+                targets["event_number"].cpu().numpy().astype(np.int64).reshape(-1, 1),
                 dtype=np.dtype([("event_number", "i8")]),
             )
         }
@@ -148,7 +149,7 @@ class PflowPredictionWriter(Callback):
         )
         if "classification" in preds:
             to_write["object_class"]["preds"] = u2s(
-                preds['classification']["pflow_class"].cpu().unsqueeze(-1).numpy(),
+                preds["classification"]["pflow_class"].cpu().unsqueeze(-1).numpy(),
                 dtype=np.dtype([("pflow_class", "i8")]),
             )
 
@@ -163,7 +164,7 @@ class PflowPredictionWriter(Callback):
         #     dtype=np.dtype([("mask_logits", np.float32)]),
         # )
         to_write["object_masks"]["preds"] = u2s(
-            outputs['mask']["pflow_node_logit"].cpu().unsqueeze(-1).float().numpy(),
+            outputs["mask"]["pflow_node_logit"].cpu().unsqueeze(-1).float().numpy(),
             dtype=np.dtype([("mask_logits", np.float32)]),
         )
 
@@ -174,24 +175,24 @@ class PflowPredictionWriter(Callback):
                 dtype=np.dtype([("truth_incidence", np.float32)]),
             )
             to_write["incidence"]["preds"] = u2s(
-                preds["incidence"]['pflow_incidence'].cpu().unsqueeze(-1).float().numpy(),
+                preds["incidence"]["pflow_incidence"].cpu().unsqueeze(-1).float().numpy(),
                 dtype=np.dtype([("pred_incidence", np.float32)]),
             )
 
         # regression
         to_write["regression"] = {}
-        for i, t in enumerate(['e', 'pt', 'eta', 'sinphi', 'cosphi']):
+        for i, t in enumerate(["e", "pt", "eta", "sinphi", "cosphi"]):
             truth_data = targets[f"particle_{t}"].cpu().float().unsqueeze(-1)
-            pred_data = preds["regression"][f'pflow_{t}'].cpu().float().unsqueeze(-1)
+            pred_data = preds["regression"][f"pflow_{t}"].cpu().float().unsqueeze(-1)
             proxy_data = None
-            if f"pflow_proxy_{t}" in preds['regression']:
-                proxy_data = preds['regression'][f'pflow_proxy_{t}'].cpu().float().unsqueeze(-1)
+            if f"pflow_proxy_{t}" in preds["regression"]:
+                proxy_data = preds["regression"][f"pflow_proxy_{t}"].cpu().float().unsqueeze(-1)
             if t in self.var_transform:
                 truth_data = self.var_transform[t].inverse_transform(truth_data)
                 pred_data = self.var_transform[t].inverse_transform(pred_data)
                 if proxy_data is not None:
                     proxy_data = self.var_transform[t].inverse_transform(proxy_data)
-            
+
             to_write["regression"][f"truth_{t}"] = u2s(
                 truth_data.numpy(),
                 dtype=np.dtype([(f"truth_{t}", np.float32)]),
@@ -236,6 +237,6 @@ class PflowPredictionWriter(Callback):
                     "phi": ak.Array(proxy_ptetaphi[..., 2]),
                 },
                 "pred_ind": ak.Array(pflow_indicator),
-                "event_number": ak.Array(event_number)[:len(pflow_indicator)],
+                "event_number": ak.Array(event_number)[: len(pflow_indicator)],
             }
         print(f"Wrote ROOT file to {root_path}")

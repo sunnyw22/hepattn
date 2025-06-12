@@ -2,7 +2,6 @@ import torch
 
 
 class MaskInference:
-
     def basic_sigmoid(pred):
         """
         Assign hits to tracks if they have a high matching probability.

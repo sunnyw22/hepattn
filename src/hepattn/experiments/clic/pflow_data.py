@@ -72,7 +72,6 @@ class CLICDataset(Dataset):
         print(f"Loading CLIC dataset from {filepath} with {num_events} samples")
         print(f"Is inference: {self.is_inference}")
 
-
         with uproot.open(filepath, num_workers=6) as f:
             tree = f["EventTree"]
             self.num_events = tree.num_entries
@@ -478,15 +477,15 @@ class CLICDataset(Dataset):
         data_dict = self.load_event(idx)
 
         inputs = {
-            'node_features': data_dict["node_inp_features"],
-            "node_valid" : data_dict["node_q_mask"],
-            'node_e': data_dict["node_raw_features"]["raw_e"],
-            'node_pt': data_dict["node_raw_features"]["raw_pt"],
-            'node_eta': data_dict["node_raw_features"]["raw_eta"],
-            'node_phi': data_dict["node_raw_features"]["raw_phi"],
-            'node_sinphi': data_dict["node_raw_features"]["sinphi"],
-            'node_cosphi': data_dict["node_raw_features"]["cosphi"],
-            'node_is_track': data_dict["node_raw_features"]["is_track"],
+            "node_features": data_dict["node_inp_features"],
+            "node_valid": data_dict["node_q_mask"],
+            "node_e": data_dict["node_raw_features"]["raw_e"],
+            "node_pt": data_dict["node_raw_features"]["raw_pt"],
+            "node_eta": data_dict["node_raw_features"]["raw_eta"],
+            "node_phi": data_dict["node_raw_features"]["raw_phi"],
+            "node_sinphi": data_dict["node_raw_features"]["sinphi"],
+            "node_cosphi": data_dict["node_raw_features"]["cosphi"],
+            "node_is_track": data_dict["node_raw_features"]["is_track"],
         }
 
         # set class labels (5 is residual & fake, 0-4 are the real classes)
@@ -495,8 +494,8 @@ class CLICDataset(Dataset):
 
         labels["particle_class"] = class_labels.long()
         labels["particle_valid"] = data_dict["indicator_truth"].bool()
-        labels['node_valid'] = data_dict["node_q_mask"].bool()
-        
+        labels["node_valid"] = data_dict["node_q_mask"].bool()
+
         # get masks
         incidence_mask = data_dict["incidence_truth"] > self.incidence_cutval
         labels["particle_node_valid"] = incidence_mask

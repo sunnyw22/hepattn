@@ -119,7 +119,7 @@ class ObjectValidTask(Task):
 
     def loss(self, outputs, targets):
         losses = {}
-        output = outputs[self.output_object + "_logit"]
+        output = outputs[self.name][self.output_object + "_logit"]
         target = targets[self.target_object + "_valid"].type_as(output)
         weight = target + self.null_weight * (1 - target)
         # Calculate the loss from each specified loss function.
@@ -169,7 +169,7 @@ class HitFilterTask(Task):
 
     def loss(self, outputs: dict, targets: dict) -> dict:
         # Pick out the field that denotes whether a hit is on a reconstructable object or not
-        output = outputs[f"{self.input_object}_logit"]
+        output = outputs[self.name][f"{self.input_object}_logit"]
         target = targets[f"{self.input_object}_{self.target_field}"].type_as(output)
 
         # Calculate the BCE loss with class weighting
@@ -280,7 +280,7 @@ class ObjectHitMaskTask(Task):
         return costs
 
     def loss(self, outputs, targets):
-        output = outputs[self.output_object_hit + "_logit"]
+        output = outputs[self.name][self.output_object_hit + "_logit"]
         target = targets[self.target_object_hit + "_valid"].type_as(output)
 
         # Build a padding mask for object-hit pairs
@@ -336,7 +336,7 @@ class RegressionTask(Task):
 
     def loss(self, outputs, targets):
         target = torch.stack([targets[self.target_object + "_" + field] for field in self.fields], dim=-1)
-        output = outputs[self.output_object + "_regr"]
+        output = outputs[self.name][self.output_object + "_regr"]
 
         # Only compute loss for valid targets
         mask = targets[self.target_object + "_valid"].clone()
@@ -527,7 +527,7 @@ class ObjectClassificationTask(Task):
 
     def loss(self, outputs, targets):
         losses = {}
-        output = outputs[self.output_object + "_class_prob"]
+        output = outputs[self.name][self.output_object + "_class_prob"]
         target = targets[self.target_object + "_class"].long()
         # Calculate the loss from each specified loss function.
         for loss_fn, loss_weight in self.losses.items():
@@ -552,6 +552,7 @@ class IncidenceRegressionTask(Task):
         losses: dict[str, float],
         costs: dict[str, float],
         net: nn.Module,
+        node_net: nn.Module | None = None,
         do_inter_loss: bool = True,
     ):
         """Incidence regression task."""
@@ -564,13 +565,14 @@ class IncidenceRegressionTask(Task):
         self.losses = losses
         self.costs = costs
         self.net = net
+        self.node_net = node_net if node_net is not None else nn.Identity()
 
         self.inputs = [input_object + "_embed", input_hit + "_embed"]
         self.outputs = [self.output_object + "_incidence"]
 
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
         x_object = self.net(x[self.input_object + "_embed"])
-        x_hit = x[self.input_hit + "_embed"]
+        x_hit = self.node_net(x[self.input_hit + "_embed"])
 
         incidence_pred = torch.einsum("bqe,ble->bql", x_object, x_hit)
         incidence_pred = incidence_pred.softmax(dim=1) * x[self.input_hit + "_valid"].unsqueeze(1).expand_as(incidence_pred)
@@ -594,7 +596,7 @@ class IncidenceRegressionTask(Task):
 
     def loss(self, outputs: dict[str, Tensor], targets: dict[str, Tensor]) -> dict[str, Tensor]:
         losses = {}
-        output = outputs[self.output_object + "_incidence"]
+        output = outputs[self.name][self.output_object + "_incidence"]
         target = targets[self.target_object + "_incidence"].type_as(output)
 
         # Create a mask for valid nodes and objects
@@ -623,6 +625,7 @@ class IncidenceBasedRegressionTask(RegressionTask):
         net: nn.Module,
         use_incidence: bool = True,
         do_inter_loss: bool = False,
+        use_nodes: bool = False,
         split_charge_neutral_loss: bool = False,
     ):
         """Regression task that uses incidence information to predict regression targets.
@@ -649,6 +652,7 @@ class IncidenceBasedRegressionTask(RegressionTask):
         self.cost_weight = cost_weight
         self.net = net
         self.split_charge_neutral_loss = split_charge_neutral_loss
+        self.use_nodes = use_nodes
 
         self.loss_masks = {
             'e' : self.get_neutral, # Only neutral particles
@@ -658,13 +662,13 @@ class IncidenceBasedRegressionTask(RegressionTask):
         self.inputs = [input_object + "_embed"] + [input_hit + "_" + field for field in fields]
         self.outputs = [output_object + "_regr", output_object + "_proxy_regr"]
 
-    def get_charged(self, classes: Tensor) -> Tensor:
+    def get_charged(self, pred: Tensor, target: Tensor) -> Tensor:
         """Get a boolean mask for charged particles based on their class."""
-        return classes < 3
+        return (pred <= 2) & (target <= 2)
     
-    def get_neutral(self, classes: Tensor) -> Tensor:
+    def get_neutral(self, pred: Tensor, target: Tensor) -> Tensor:
         """Get a boolean mask for neutral particles based on their class."""
-        return classes >= 3
+        return (pred > 2) & (target > 2)
 
     def forward(self, x: dict[str, Tensor], pads: dict[str, Tensor] | None = None) -> dict[str, Tensor]:
         # get the predictions
@@ -679,10 +683,15 @@ class IncidenceBasedRegressionTask(RegressionTask):
                 ],
                 -1,
             )
-            preds = self.net(input_data)
+            if self.use_nodes:
+                valid_mask = x[self.input_hit + "_valid"].unsqueeze(-1)
+                masked_embed = x[self.input_hit + "_embed"] * valid_mask
+                node_feats = torch.bmm(inc, masked_embed)
+                input_data = torch.cat([input_data, node_feats], dim=-1)
         else:
-            preds = self.net(x[self.input_object + "_embed"])
+            input_data = x[self.input_object + "_embed"]
             proxy_feats = torch.zeros_like(preds)
+        preds = self.net(input_data)
         return {self.output_object + "_regr": preds, self.output_object + "_proxy_regr": proxy_feats}
 
     def predict(self, outputs):
@@ -709,7 +718,7 @@ class IncidenceBasedRegressionTask(RegressionTask):
         )[:, None, :]
         target_eta = targets[self.target_object + "_eta"][:, None, :]
         # Compute the cost based on the difference in phi and eta
-        dphi = (pred_phi - target_phi) % (2 * torch.pi) - torch.pi
+        dphi = (pred_phi - target_phi + torch.pi) % (2 * torch.pi) - torch.pi
         deta = (pred_eta - target_eta) * self.scaler["eta"].scale
 
         # Compute the cost as the sum of the squared differences
@@ -720,12 +729,14 @@ class IncidenceBasedRegressionTask(RegressionTask):
 
     def loss(self, outputs, targets):
         loss = None
+        target_class = targets[self.target_object + "_class"]
+        output_class = outputs["classification"][self.output_object + "_class_prob"].detach().argmax(-1)
         for i, field in enumerate(self.fields):
             target = targets[self.target_object + "_" + field]
-            output = outputs[self.output_object + "_regr"][..., i]
+            output = outputs[self.name][self.output_object + "_regr"][..., i]
             mask = targets[self.target_object + "_valid"].clone()
             if self.split_charge_neutral_loss and field in self.loss_masks:
-                mask = mask & self.loss_masks[field](targets[self.target_object + "_class"])
+                mask = mask & self.loss_masks[field](output_class, target_class)
             if loss is None:
                 loss = torch.nn.functional.smooth_l1_loss(output[mask], target[mask], reduction="mean")
             else:
@@ -771,7 +782,8 @@ class IncidenceBasedRegressionTask(RegressionTask):
         charged_inc_top2 = (topk_attn(charged_inc, 2, dim=-2) & (charged_inc > 0)).float()
         charged_inc_max = charged_inc.max(-2, keepdim=True)[0]
         charged_inc_new = (charged_inc == charged_inc_max) & (charged_inc > 0)
-        charged_inc_new = charged_inc.float()
+        # TODO: check this
+        # charged_inc_new = charged_inc.float()
         zero_track_mask = charged_inc_new.sum(-1, keepdim=True) == 0
         charged_inc = torch.where(zero_track_mask, charged_inc_top2, charged_inc_new)
 

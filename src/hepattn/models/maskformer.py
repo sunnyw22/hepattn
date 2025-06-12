@@ -253,6 +253,6 @@ class MaskFormer(nn.Module):
                 if task.do_inter_loss == False and layer_name != "final":
                     # Skip tasks that do not contribute to the intermediate loss
                     continue
-                losses[layer_name][task.name] = task.loss(outputs[layer_name][task.name], targets)
+                losses[layer_name][task.name] = task.loss(outputs[layer_name], targets)
 
         return losses

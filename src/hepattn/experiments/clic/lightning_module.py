@@ -6,6 +6,7 @@ from hepattn.experiments.clic.metrics import MaskInference
 from hepattn.models.wrapper import ModelWrapper
 import os
 
+
 class MPflow(ModelWrapper):
     def __init__(
         self,
@@ -39,7 +40,7 @@ class MPflow(ModelWrapper):
         for key, value in preds.items():
             for task_name, task_value in value.items():
                 if task_name == "classification":
-                    particle_class_preds = task_value['pflow_class'].squeeze()  # remove batch index
+                    particle_class_preds = task_value["pflow_class"].squeeze()  # remove batch index
 
                     # object class prediction metrics
                     self.obj_accuracy_micro(particle_class_preds.view(-1), particle_class_labels.view(-1))

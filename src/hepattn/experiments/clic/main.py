@@ -10,6 +10,7 @@ from hepattn.utils.cli import CLI
 
 config_dir = pathlib.Path(__file__).parent / "configs"
 
+
 def main(args: ArgsType = None) -> None:
     CLI(
         model_class=MPflow,
