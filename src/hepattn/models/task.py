@@ -233,7 +233,8 @@ class ObjectHitMaskTask(Task):
         self.target_object_hit = target_object + "_" + input_hit
         self.inputs = [input_object + "_embed", input_hit + "_embed"]
         self.outputs = [self.output_object_hit + "_logit"]
-        self.hit_net = Dense(dim, dim)
+        # self.hit_net = Dense(dim, dim)
+        # self.hit_net = nn.Identity()
         self.object_net = Dense(dim, dim)
 
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
@@ -257,7 +258,8 @@ class ObjectHitMaskTask(Task):
 
         # If the attn mask is completely padded for a given entry, unpad it - tested and is required (?)
         # TODO: See if the query masking stops this from being necessary
-        attn_mask[torch.where(torch.all(attn_mask, dim=-1))] = False
+        # WHY?
+        # attn_mask[torch.where(torch.all(attn_mask, dim=-1))] = False
 
         return {self.input_hit: attn_mask}
 
@@ -266,8 +268,8 @@ class ObjectHitMaskTask(Task):
         return {self.output_object_hit + "_valid": outputs[self.output_object_hit + "_logit"].detach().sigmoid() >= self.pred_threshold}
 
     def cost(self, outputs, targets):
-        output = outputs[self.output_object_hit + "_logit"].detach().to(torch.float32)
-        target = targets[self.target_object_hit + "_valid"].to(torch.float32)
+        output = outputs[self.output_object_hit + "_logit"].detach()
+        target = targets[self.target_object_hit + "_valid"].detach().to(output.dtype)
 
         costs = {}
         for cost_fn, cost_weight in self.costs.items():
@@ -282,16 +284,17 @@ class ObjectHitMaskTask(Task):
         target = targets[self.target_object_hit + "_valid"].type_as(output)
 
         # Build a padding mask for object-hit pairs
-        hit_pad = targets[self.input_hit + "_valid"].unsqueeze(-2).expand_as(target)
-        object_pad = targets[self.target_object + "_valid"].unsqueeze(-1).expand_as(target)
+        # hit_pad = targets[self.input_hit + "_valid"].unsqueeze(-2).expand_as(target)
+        # object_pad = targets[self.target_object + "_valid"].unsqueeze(-1).expand_as(target)
         # An object-hit is valid slot if both its object and hit are valid slots
         # TODO: Maybe calling this a mask is confusing since true entries are
-        object_hit_mask = object_pad & hit_pad
+        # object_hit_mask = object_pad & hit_pad
 
         # Mask only valid objects
-        # object_hit_mask = targets[self.target_object + "_valid"]
+        object_hit_mask = targets[self.target_object + "_valid"]
 
-        weight = target + self.null_weight * (1 - target)
+        # weight = target + self.null_weight * (1 - target)
+        weight = None
 
         losses = {}
         for loss_fn, loss_weight in self.losses.items():
@@ -666,8 +669,8 @@ class IncidenceBasedRegressionTask(RegressionTask):
     def forward(self, x: dict[str, Tensor], pads: dict[str, Tensor] | None = None) -> dict[str, Tensor]:
         # get the predictions
         if self.use_incidence:
-            inc = x["incidence"]
-            proxy_feats, is_charged = self.get_proxy_feats(inc, x, class_probs=x["class_probs"])
+            inc = x["incidence"].detach()
+            proxy_feats, is_charged = self.get_proxy_feats(inc, x, class_probs=x["class_probs"].detach())
             input_data = torch.cat(
                 [
                     x[self.input_object + "_embed"],

@@ -1,4 +1,4 @@
-name: &name CLIC_Pflow_FullDice
+name: CLIC_Pflow_Full
 seed_everything: 42
 
 data:
@@ -24,15 +24,13 @@ data:
   num_objects: &num_particles 150
 
   train_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/train_clic_fix.root
-  # train_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/val_clic_fix.root 
   valid_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/val_clic_fix.root 
-  test_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/val_clic_fix.root 
-  # test_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/test_clic_fix.root 
+  test_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/test_clic_fix.root 
 
   # Number of events to include in each set
-  num_workers: 10
+  num_workers: 8
   num_train: -1
-  num_test: 10
+  num_test: -1
   num_val: 5000
 
   batch_size: 128
@@ -42,8 +40,8 @@ data:
 
 # Training stuff here
 trainer:
-  max_epochs: 2000
-  devices: 1
+  max_epochs: 200
+  devices: 4
   precision: bf16-mixed
   default_root_dir: logs
   enable_progress_bar: True
@@ -53,11 +51,10 @@ trainer:
     class_path: lightning.pytorch.loggers.CometLogger
     init_args:
       project: clic
-      experiment_name: *name
 
   callbacks:
     - class_path: hepattn.callbacks.InferenceTimer
-    - class_path: hepattn.callbacks.Metadata
+    - class_path: hepattn.callbacks.SaveConfig
     - class_path: hepattn.callbacks.Checkpoint
       init_args:
         monitor: val/loss
@@ -80,12 +77,12 @@ model:
   optimizer: AdamW
 
   lrs_config:
-    initial: 1e-5
-    max: 4e-5
+    initial: 1e-6
+    max: 1e-4
     end: 1e-5
-    pct_start: 0.01
+    pct_start: 0.05
+    weight_decay: 0.03
     skip_scheduler: false
-    weight_decay: 1e-5
 
   mtl: false
 
@@ -176,11 +173,11 @@ model:
                 logit_scale: 4
                 losses:
                   mask_ce: 5.0
-                  mask_dice: 1
+                  # mask_dice: 1
                   # mask_focal: 2
                 costs:
                   mask_ce: 5.0
-                  mask_dice: 1
+                  # mask_dice: 1
                   # mask_focal: 2
                 dim: *dim
                 null_weight: 1.0

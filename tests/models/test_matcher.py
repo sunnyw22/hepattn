@@ -24,7 +24,7 @@ class TestMatcher:
         costs_dice = mask_dice_costs(pred_mask, true_mask)
         costs_focal = mask_focal_costs(pred_mask, true_mask)
 
-        for solver in ["scipy"]:
+        for solver in ["scipy", "1015_early", "1015_late"]:
             matcher = Matcher(default_solver=solver, adaptive_solver=False)
 
             for costs in [costs_ce, costs_dice, costs_focal]:

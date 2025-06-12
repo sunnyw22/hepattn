@@ -8,7 +8,7 @@ class MaskFormer(nn.Module):
     def __init__(
         self,
         input_nets: nn.ModuleList,
-        encoder: nn.Module,
+        encoder: nn.Module | None,
         decoder_layer_config: dict,
         num_decoder_layers: int,
         tasks: nn.ModuleList,
@@ -234,13 +234,12 @@ class MaskFormer(nn.Module):
                         layer_costs = cost
 
             costs[layer_name] = layer_costs.detach()
-
+        
+        batch_idxs = torch.arange(targets['particle_valid'].shape[0]).unsqueeze(1)
         # Permute the outputs for each output in each layer
         for layer_name in outputs:
             # Get the indicies that can permute the predictions to yield their optimal matching
-            pred_idxs = self.matcher(costs[layer_name])
-            batch_idxs = torch.arange(costs[layer_name].shape[0]).unsqueeze(1).expand(-1, self.num_queries)
-
+            pred_idxs = self.matcher(costs[layer_name], targets['particle_valid'])
             # Apply the permutation in place
             for task in self.tasks:
                 for output_name in task.outputs:

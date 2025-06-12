@@ -9,7 +9,7 @@ def object_bce_loss(pred_logits, true, mask=None, weight=None):  # noqa: ARG001
 
 
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
-@torch.autocast(device_type="cuda", enabled=False)
+# @torch.autocast(device_type="cuda", enabled=False)
 def object_bce_costs(pred_logits, true):
     costs = F.binary_cross_entropy_with_logits(
         pred_logits.unsqueeze(2).expand(-1, -1, true.shape[1]), true.unsqueeze(1).expand(-1, pred_logits.shape[1], -1), reduction="none"
@@ -23,39 +23,39 @@ def object_ce_loss(pred_probs, true, mask=None, weight=None):
 
 
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
-@torch.autocast(device_type="cuda", enabled=False)
+# @torch.autocast(device_type="cuda", enabled=False)
 def object_ce_costs(pred_probs, true):
+    pred_probs = pred_probs.softmax(-1)  # Ensure probabilities are normalized
     true = true.unsqueeze(1).expand(-1, pred_probs.shape[1], -1)
     costs = -torch.gather(pred_probs, 2, true)
     return costs
 
 
 def mask_dice_loss(pred_logits, true, mask=None, weight=None, eps=1):
-    pred = pred_logits.sigmoid()
-    intersection = (pred * true).sum(-1)
-    num_pred = pred.sum(-1)
-    num_true = true.sum(-1)
-    losses = 1 - (2 * intersection + eps) / (num_pred + num_true + eps)
-
     if mask is not None:
-        losses = losses[mask]
-    
-    return losses.mean()
-
+        pred_logits = pred_logits[mask]
+        true = true[mask]
+    inputs = pred_logits.sigmoid()
+    numerator = 2 * (inputs * true).sum(-1)
+    denominator = inputs.sum(-1) + true.sum(-1)
+    loss = 1 - (numerator + 1) / (denominator + 1)
+    return loss.sum() / len(inputs)
 
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
-@torch.autocast(device_type="cuda", enabled=False)
-def mask_dice_costs(pred_logits, true, eps=1):
+# @torch.autocast(device_type="cuda", enabled=False)
+def mask_dice_costs(pred_logits, true):
+    inputs = pred_logits.sigmoid()
+    # inputs has shape (B, N, C), targets has shape (B, M, C)
+    # We want to compute the DICE loss for each combination of N and M for each batch
 
-    pred = pred_logits.sigmoid()
+    # Using torch.einsum to handle the batched matrix multiplication
+    numerator = 2 * torch.einsum("bnc,bmc->bnm", inputs, true)
+    # Compute the denominator using sum over the last dimension (C) and broadcasting
+    denominator = inputs.sum(-1).unsqueeze(2) + true.sum(-1).unsqueeze(1)
 
-    num_pred = pred.sum(-1).unsqueeze(2)
-    num_true = true.sum(-1).unsqueeze(1)
+    loss = 1 - (numerator + 1) / (denominator + 1)
 
-    intersection = torch.einsum("bnc,bmc->bnm", pred, true)
-    costs = 1 - (2 * intersection + eps) / (num_pred + num_true + eps)
-
-    return costs
+    return loss
 
 
 def mask_iou_costs(pred_logits, true, eps=1e-6):
@@ -72,59 +72,50 @@ def mask_iou_costs(pred_logits, true, eps=1e-6):
 
 
 def focal_loss(pred_logits, targets, balance=False, gamma=2.0, mask=None, weight=None):
-    pred = pred_logits.sigmoid()
-    ce_loss = F.binary_cross_entropy_with_logits(pred_logits, targets.type_as(pred_logits), reduction="none")
-    p_t = pred * targets + (1 - pred) * (1 - targets)
-    losses = ce_loss * ((1 - p_t) ** gamma)
-
-    if balance:
-        alpha = 1 - targets.float().mean()
-        alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
-        losses = alpha_t * losses
-
-    if weight is not None:
-        losses *= weight
-
+    # Not calculate the loss for the padded elements
     if mask is not None:
-        losses = losses[mask]
+        pred_logits = pred_logits[mask]
+        targets = targets[mask]
+    prob = pred_logits.sigmoid()
+    ce_loss = F.binary_cross_entropy_with_logits(pred_logits, targets, reduction="none")
+    p_t = prob * targets + (1 - prob) * (1 - targets)
+    loss = ce_loss * ((1 - p_t) ** gamma)
 
-    return losses.mean()
+    return loss.mean(1).sum() / len(prob)
 
 
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
-@torch.autocast(device_type="cuda", enabled=False)
+# @torch.autocast(device_type="cuda", enabled=False)
 def mask_focal_costs(pred_logits, true, alpha=-1.0, gamma=2.0):
-    pred = pred_logits.sigmoid()
-    focal_pos = ((1 - pred) ** gamma) * F.binary_cross_entropy_with_logits(pred_logits, torch.ones_like(pred), reduction="none")
-    focal_neg = (pred**gamma) * F.binary_cross_entropy_with_logits(pred_logits, torch.zeros_like(pred), reduction="none")
+    prob = pred_logits.sigmoid()
+    focal_pos = ((1 - prob) ** gamma) * F.binary_cross_entropy_with_logits(pred_logits, torch.ones_like(pred_logits), reduction="none")
+    focal_neg = (prob**gamma) * F.binary_cross_entropy_with_logits(pred_logits, torch.zeros_like(pred_logits), reduction="none")
     if alpha >= 0:
-        focal_pos *= alpha
-        focal_neg *= 1 - alpha
-
-    costs = torch.einsum("bnc,bmc->bnm", focal_pos, true) + torch.einsum("bnc,bmc->bnm", focal_neg, (1 - true))
-
-    return costs
+        focal_pos = focal_pos * alpha
+        focal_neg = focal_neg * (1 - alpha)
+    loss = torch.einsum("bnc,bmc->bnm", focal_pos, true) + torch.einsum("bnc,bmc->bnm", focal_neg, (1 - true))
+    return loss / pred_logits.shape[2]
 
 
 def mask_ce_loss(pred_logits, true, mask=None, weight=None):
-    losses = F.binary_cross_entropy_with_logits(pred_logits, true, weight=weight, reduction="none")
-
+    # Not calculate the loss for the padded elements
     if mask is not None:
-        losses = losses[mask]
+        pred_logits = pred_logits[mask]
+        true = true[mask]
+        weight = weight[mask] if weight is not None else None
 
-    return losses.mean()
+    losses = F.binary_cross_entropy_with_logits(pred_logits, true, weight=weight, reduction="none")
+    losses = losses.mean(-1) # Average over the classes
+
+    return losses.sum() / len(pred_logits)
 
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
-@torch.autocast(device_type="cuda", enabled=False)
+# @torch.autocast(device_type="cuda", enabled=False)
 def mask_ce_costs(pred_logits, true):
-    # pred_logits = torch.clamp(pred_logits, -100, 100)
-
     pos = F.binary_cross_entropy_with_logits(pred_logits, torch.ones_like(pred_logits), reduction="none")
     neg = F.binary_cross_entropy_with_logits(pred_logits, torch.zeros_like(pred_logits), reduction="none")
-
-    costs = torch.einsum("bnc,bmc->bnm", pos, true) + torch.einsum("bnc,bmc->bnm", neg, (1 - true))
-
-    return costs
+    loss = torch.einsum("bnc,bmc->bnm", pos, true) + torch.einsum("bnc,bmc->bnm", neg, (1 - true))
+    return loss / pred_logits.shape[2]
 
 
 def kl_div_loss(pred_logits, true, mask=None, weight=None):
@@ -135,7 +126,7 @@ def kl_div_loss(pred_logits, true, mask=None, weight=None):
 
 
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
-@torch.autocast(device_type="cuda", enabled=False)
+# @torch.autocast(device_type="cuda", enabled=False)
 def kl_div_costs(pred_logits, true):
     return (-true[:, None, :] * torch.log(pred_logits[:, :, None] + 1e-8)).mean(-1)
 

@@ -5,8 +5,8 @@ from lightning import LightningModule
 from lion_pytorch import Lion
 from torch import nn
 from torch.optim import AdamW
-from torchjd import mtl_backward
-from torchjd.aggregation import UPGrad
+# from torchjd import mtl_backward
+# from torchjd.aggregation import UPGrad
 
 
 class ModelWrapper(LightningModule):
@@ -64,7 +64,7 @@ class ModelWrapper(LightningModule):
 
             # If the task returned a non-empty metrics dict, log it
             if task_metrics:
-                self.log_dict({f"{stage}/final_{task.name}_{k}": v for k, v in task_metrics.items()})
+                self.log_dict({f"{stage}/final_{task.name}_{k}": v for k, v in task_metrics.items()}, sync_dist=True)
 
     def log_metrics(self, preds, targets, stage):
         # First log any task metrics
@@ -90,9 +90,9 @@ class ModelWrapper(LightningModule):
             self.log_metrics(preds, targets, "train")
 
         # Use Jacobian Descent for Multi Task Learning https://arxiv.org/abs/2406.16232
-        if self.mtl:
-            self.mlt_opt(losses, outputs)
-            return None
+        # if self.mtl:
+        #     self.mlt_opt(losses, outputs)
+        #     return None
 
         return total_loss
 
@@ -140,7 +140,7 @@ class ModelWrapper(LightningModule):
         else:
             raise ValueError(f"Unknown optimizer: {self.opt_config['opt']}")
 
-        opt = optimizer(self.model.parameters(), lr=self.lrs_config["initial"], weight_decay=self.lrs_config["weight_decay"])
+        opt = optimizer(self.parameters(), lr=self.lrs_config["initial"], weight_decay=self.lrs_config["weight_decay"])
 
         if not self.lrs_config.get("skip_scheduler"):
             # Configure the learning rate scheduler
@@ -157,23 +157,23 @@ class ModelWrapper(LightningModule):
         print("Skipping learning rate scheduler.")
         return opt
 
-    def mlt_opt(self, losses, outputs):
-        opt = self.optimizers()
-        opt.zero_grad()
+    # def mlt_opt(self, losses, outputs):
+    #     opt = self.optimizers()
+    #     opt.zero_grad()
 
-        for layer_name, layer_losses in losses.items():
-            # Get a list of the features that are used by all of the tasks
-            layer_feature_names = set()
-            for task in self.model.tasks:
-                layer_feature_names.update(task.inputs)
+    #     for layer_name, layer_losses in losses.items():
+    #         # Get a list of the features that are used by all of the tasks
+    #         layer_feature_names = set()
+    #         for task in self.model.tasks:
+    #             layer_feature_names.update(task.inputs)
 
-            # Remove any duplicate features that are used by multiple tasks
-            layer_features = [outputs[layer_name][feature_name] for feature_name in layer_feature_names]
+    #         # Remove any duplicate features that are used by multiple tasks
+    #         layer_features = [outputs[layer_name][feature_name] for feature_name in layer_feature_names]
 
-            # Perform the backward pass for this layer
-            # For each layer we sum the losses from each task, so we get one loss per task
-            layer_losses = [sum(losses[layer_name][task.name].values()) for task in self.model.tasks]
+    #         # Perform the backward pass for this layer
+    #         # For each layer we sum the losses from each task, so we get one loss per task
+    #         layer_losses = [sum(losses[layer_name][task.name].values()) for task in self.model.tasks]
 
-            mtl_backward(losses=layer_losses, features=layer_features, aggregator=UPGrad())
+    #         mtl_backward(losses=layer_losses, features=layer_features, aggregator=UPGrad())
 
-        opt.step()
+    #     opt.step()

@@ -41,7 +41,8 @@ class PredictionWriter(Callback):
         # The output dataset will be saved in the same direcory as the checkpoint
         out_dir = Path(self.trainer.ckpt_path).parent
         out_basename = str(Path(self.trainer.ckpt_path).stem)
-        split = Path(self.dataset.dirpath).name
+        # split = Path(self.dataset.dirpath).name
+        split= ""
         return Path(out_dir / f"{out_basename}_{split}_eval.h5")
 
     def on_test_start(self, trainer: Trainer, module: LightningModule) -> None:
@@ -53,7 +54,7 @@ class PredictionWriter(Callback):
         outputs, preds, losses = test_step_outputs
 
         # Get all of the sample IDs in the batch, this is what will be used to retrieve the samples
-        sample_ids = targets["sample_id"]
+        sample_ids = targets["event_number"]
 
         # Iterate through all of the samples in the batch
         for idx in range(len(sample_ids)):
@@ -83,6 +84,9 @@ class PredictionWriter(Callback):
         # sample_id/inputs/pixel_x
         items_group = sample_group.create_group(item_name)
         for name, value in items.items():
+            if name == "event_number":
+                # Skip the event number as it is already used to create the sample group
+                continue
             self.create_dataset(items_group, name, value[idx][None, ...])
 
     def write_layer_task_items(self, sample_group, item_name, items, idx):
@@ -98,6 +102,10 @@ class PredictionWriter(Callback):
             for task_name, task_items in layer_items.items():
                 task_group = layer_group.create_group(task_name)
                 for name, value in task_items.items():
+                    if name == "event_number":
+                        # Skip the event number as it is already used to create the sample group
+                        continue
+                    print(name, value.shape)
                     self.create_dataset(task_group, name, value[idx][None, ...])
 
     def on_test_epoch_end(self, trainer, module):

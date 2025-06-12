@@ -130,6 +130,7 @@ class PflowPredictionWriter(Callback):
     def on_test_batch_end(self, trainer, module, test_step_outputs, batch, batch_idx):  # noqa: ARG002
         inputs, targets = batch
         outputs, preds, losses = test_step_outputs
+        outputs = outputs['final']
         preds = preds['final']
         to_write = {}
         # Event numbers
@@ -157,8 +158,12 @@ class PflowPredictionWriter(Callback):
             targets["particle_node_valid"].cpu().unsqueeze(-1).numpy(),
             dtype=np.dtype([("truth_masks", "i8")]),
         )
+        # to_write["object_masks"]["preds"] = u2s(
+        #     preds['mask']["pflow_node_valid"].cpu().unsqueeze(-1).float().numpy(),
+        #     dtype=np.dtype([("mask_logits", np.float32)]),
+        # )
         to_write["object_masks"]["preds"] = u2s(
-            preds['mask']["pflow_node_valid"].cpu().unsqueeze(-1).float().numpy(),
+            outputs['mask']["pflow_node_logit"].cpu().unsqueeze(-1).float().numpy(),
             dtype=np.dtype([("mask_logits", np.float32)]),
         )
 
