@@ -344,12 +344,12 @@ def plot_eff_fr_purity(eff_fr_purity_input_dict, stylesheet=None):
     ax2.set_xlabel("Pred $p_\\mathrm{T}$ [GeV]")
     ax2.set_ylabel("Fake rate")
     # ax2.set_ylim(-0.05, 1.05)
-    ax2.set_ylim(-0.05, 0.25)
+    ax2.set_ylim(-0.05, 0.35)
 
     ax3.set_xlabel("Truth $p_\\mathrm{T}$ [GeV]")
     ax3.set_ylabel("$p$(class match | match)")
     # ax3.set_ylim(-0.05, 1.05)
-    ax3.set_ylim(0.75, 1.05)
+    ax3.set_ylim(0.65, 1.05)
 
     for ax in [ax1, ax2, ax3]:
         ax.minorticks_on()

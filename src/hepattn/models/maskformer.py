@@ -126,6 +126,8 @@ class MaskFormer(nn.Module):
             for task in self.tasks:
                 # Get the outputs of the task given the current embeddings and record them
                 task_outputs = task(x)
+
+                # Need this for incidence-based regression task
                 if task.name == "incidence":
                     # Assume that the incidence task has only one output
                     x["incidence"] = task_outputs[task.outputs[0]].detach()
@@ -177,6 +179,14 @@ class MaskFormer(nn.Module):
         outputs["final"] = {}
         for task in self.tasks:
             outputs["final"][task.name] = task(x)
+
+            # Need this for incidence-based regression task
+            if task.name == "incidence":
+                # Assume that the incidence task has only one output
+                x["incidence"] = outputs["final"][task.name][task.outputs[0]].detach()
+            if task.name == "classification":
+                # Assume that the classification task has only one output
+                x["class_probs"] = outputs["final"][task.name][task.outputs[0]].detach()
 
         return outputs
 
@@ -234,12 +244,12 @@ class MaskFormer(nn.Module):
                         layer_costs = cost
 
             costs[layer_name] = layer_costs.detach()
-        
-        batch_idxs = torch.arange(targets['particle_valid'].shape[0]).unsqueeze(1)
+
+        batch_idxs = torch.arange(targets["particle_valid"].shape[0]).unsqueeze(1)
         # Permute the outputs for each output in each layer
         for layer_name in outputs:
             # Get the indicies that can permute the predictions to yield their optimal matching
-            pred_idxs = self.matcher(costs[layer_name], targets['particle_valid'])
+            pred_idxs = self.matcher(costs[layer_name], targets["particle_valid"])
             # Apply the permutation in place
             for task in self.tasks:
                 for output_name in task.outputs:

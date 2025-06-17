@@ -1,4 +1,4 @@
-name: CLIC_Pflow_FullDiceFoc
+name: CLIC_Pflow_FullDiceFocFix
 seed_everything: 42
 
 data:
@@ -6,7 +6,6 @@ data:
   scale_dict_path: &scale_dict_path /storage/agrp/dmitrykl/hgpf/hepattn/src/hepattn/experiments/clic/configs/clic_var_transform.yaml
 
 model:
-
   lrs_config:
     initial: 1e-6
     max: 1e-4
@@ -67,7 +66,6 @@ model:
           default_solver: 1015_late
           adaptive_solver: false
           adaptive_check_interval: 1000
-
 
       tasks:
         class_path: torch.nn.ModuleList
@@ -141,7 +139,7 @@ model:
                     activation: torch.nn.SiLU
                     output_size: *dim
                     hidden_layers: [*dim]
-                  
+
             - class_path: hepattn.models.task.IncidenceBasedRegressionTask
               init_args:
                 name: regression

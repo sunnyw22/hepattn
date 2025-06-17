@@ -655,8 +655,8 @@ class IncidenceBasedRegressionTask(RegressionTask):
         self.use_nodes = use_nodes
 
         self.loss_masks = {
-            'e' : self.get_neutral, # Only neutral particles
-            'pt' : self.get_charged, # Only charged particles
+            "e": self.get_neutral,  # Only neutral particles
+            "pt": self.get_charged,  # Only charged particles
         }
 
         self.inputs = [input_object + "_embed"] + [input_hit + "_" + field for field in fields]
@@ -665,7 +665,7 @@ class IncidenceBasedRegressionTask(RegressionTask):
     def get_charged(self, pred: Tensor, target: Tensor) -> Tensor:
         """Get a boolean mask for charged particles based on their class."""
         return (pred <= 2) & (target <= 2)
-    
+
     def get_neutral(self, pred: Tensor, target: Tensor) -> Tensor:
         """Get a boolean mask for neutral particles based on their class."""
         return (pred > 2) & (target > 2)

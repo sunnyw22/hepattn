@@ -74,19 +74,19 @@ class Matcher(nn.Module):
         # Do the matching sequentially for each example in the batch
         for k in range(len(costs)):
             C = costs[k][:, : batch_obj_lengths[k]]  # Get the cost matrix for the k-th element in batch
-            pred_idx = self.solver(C) # Solve the assignment problem
+            pred_idx = self.solver(C)  # Solve the assignment problem
             if self.default_solver == "scipy":
                 # Create full assignment
                 full_col_idx = torch.empty(costs.shape[2], dtype=torch.long)
-                full_col_idx[:batch_obj_lengths[k]] = pred_idx
-                full_col_idx[batch_obj_lengths[k]:] = torch.tensor(list(self.default_idx - set(pred_idx.numpy())), dtype=torch.long)
+                full_col_idx[: batch_obj_lengths[k]] = pred_idx
+                full_col_idx[batch_obj_lengths[k] :] = torch.tensor(list(self.default_idx - set(pred_idx.numpy())), dtype=torch.long)
                 pred_idx = full_col_idx
 
             # These indicies can be used to permute the predictions so they now match the truth objects
             idxs.append(pred_idx)
         # Stack the indices into a tensor
         pred_idxs = torch.stack(idxs)
-        
+
         return pred_idxs
 
     @torch.no_grad()

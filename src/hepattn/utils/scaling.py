@@ -51,6 +51,7 @@ class VarTransform:
 
         return x
 
+
 def get_empty_transform() -> VarTransform:
     """
     Get an empty VarTransform that does not apply any transformation.
@@ -61,6 +62,7 @@ def get_empty_transform() -> VarTransform:
         An instance of VarTransform with no transformation applied.
     """
     return VarTransform("", {"type": "std", "mean": 0.0, "std": 1.0})
+
 
 class FeatureScaler:
     def __init__(self, scale_dict_path: str):

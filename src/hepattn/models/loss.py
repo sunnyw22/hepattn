@@ -41,6 +41,7 @@ def mask_dice_loss(pred_logits, true, mask=None, weight=None, eps=1):
     loss = 1 - (numerator + 1) / (denominator + 1)
     return loss.sum() / len(inputs)
 
+
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
 # @torch.autocast(device_type="cuda", enabled=False)
 def mask_dice_costs(pred_logits, true):
@@ -105,9 +106,10 @@ def mask_ce_loss(pred_logits, true, mask=None, weight=None):
         weight = weight[mask] if weight is not None else None
 
     losses = F.binary_cross_entropy_with_logits(pred_logits, true, weight=weight, reduction="none")
-    losses = losses.mean(-1) # Average over the classes
+    losses = losses.mean(-1)  # Average over the classes
 
     return losses.sum() / len(pred_logits)
+
 
 # Context manager necessary to overwride global autocast to ensure float32 cost is returned
 # @torch.autocast(device_type="cuda", enabled=False)

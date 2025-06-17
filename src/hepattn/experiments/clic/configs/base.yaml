@@ -2,7 +2,6 @@ name: CLIC_Pflow_Full
 seed_everything: 42
 
 data:
-
   inputs:
     hit:
       - "x"
@@ -24,8 +23,8 @@ data:
   num_objects: &num_particles 150
 
   train_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/train_clic_fix.root
-  valid_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/val_clic_fix.root 
-  test_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/test_clic_fix.root 
+  valid_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/val_clic_fix.root
+  test_path: /storage/agrp/dmitrykl/hgpf/hepformer/data/nilo/test_clic_fix.root
 
   # Number of events to include in each set
   num_workers: 8
@@ -208,7 +207,7 @@ model:
                     input_size: *dim
                     output_size: *dim
                     hidden_layers: [*dim]
-                  
+
             - class_path: hepattn.models.task.IncidenceBasedRegressionTask
               init_args:
                 name: regression
