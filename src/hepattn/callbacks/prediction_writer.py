@@ -2,10 +2,9 @@ from pathlib import Path
 
 import h5py
 from lightning import Callback, LightningModule, Trainer
-from torch import Tensor
 
 from hepattn.utils.tensor_utils import tensor_to_numpy
-
+from torch import Tensor
 
 class PredictionWriter(Callback):
     def __init__(
@@ -45,8 +44,7 @@ class PredictionWriter(Callback):
         # The output dataset will be saved in the same directory as the checkpoint
         out_dir = Path(self.trainer.ckpt_path).parent
         out_basename = str(Path(self.trainer.ckpt_path).stem)
-        # split = Path(self.dataset.dirpath).name
-        split = ""
+        split = Path(self.dataset.dirpath).name
         return Path(out_dir / f"{out_basename}_{split}_eval.h5")
 
     def on_test_batch_end(self, trainer, pl_module, test_step_outputs, batch, batch_idx):
@@ -54,9 +52,9 @@ class PredictionWriter(Callback):
         outputs, preds, losses = test_step_outputs
 
         # handle batched case
-        if "sample_id" in targets or "event_number" in targets:  # TODO: standardise
+        if "sample_id" in targets:
             # Get all of the sample IDs in the batch, this is what will be used to retrieve the samples
-            sample_ids = targets["sample_id"] if "sample_id" in targets else targets["event_number"]  # TODO: standardise
+            sample_ids = targets["sample_id"]
 
             # Iterate through all of the samples in the batch
             for idx, sample_id in enumerate(sample_ids):
@@ -98,9 +96,6 @@ class PredictionWriter(Callback):
         # sample_id/inputs/pixel_x
         items_group = sample_group.create_group(item_name)
         for name, value in items.items():
-            if name == "event_number":
-                # Skip the event number as it is already used to create the sample group
-                continue
             self.create_dataset(items_group, name, value[idx][None, ...])
 
     def write_layer_task_items(self, sample_group, item_name, items, idx):
@@ -116,10 +111,6 @@ class PredictionWriter(Callback):
             for task_name, task_items in layer_items.items():
                 task_group = layer_group.create_group(task_name)
                 for name, value in task_items.items():
-                    if name == "event_number":
-                        # Skip the event number as it is already used to create the sample group
-                        continue
-                    print(name, value.shape)
                     self.create_dataset(task_group, name, value[idx][None, ...])
 
     def create_dataset(self, group, name, value):

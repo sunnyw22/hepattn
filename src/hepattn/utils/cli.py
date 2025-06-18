@@ -39,7 +39,7 @@ def get_best_epoch(config_path: Path) -> Path:
     if len(ckpts) == 0:
         raise FileNotFoundError(f"No checkpoints found in {ckpt_dir.resolve()!r}")
     exp = r"(?<=loss=)(?:(?:\d+(?:\.\d*)?|\.\d+))"
-    losses = [float(re.findall(exp, Path(ckpt).name)[0]) if 'last.ckpt' not in ckpt.name else 1e3 for ckpt in ckpts]
+    losses = [float(re.findall(exp, Path(ckpt).name)[0]) for ckpt in ckpts]
     ckpt = ckpts[np.argmin(losses)]
     print(f"Using checkpoint {ckpt.resolve()!r}")
     return ckpt
@@ -48,19 +48,14 @@ def get_best_epoch(config_path: Path) -> Path:
 class CLI(LightningCLI):
     def add_arguments_to_parser(self, parser) -> None:
         parser.add_argument("--name", default="hepattn", help="Name for this training run.")
-        # parser.link_arguments("name", "trainer.logger.dict_kwargs.name")
+        parser.link_arguments("name", "trainer.logger.init_args.experiment_name")
         parser.link_arguments("name", "model.name")
         parser.link_arguments("trainer.default_root_dir", "trainer.logger.init_args.save_dir")
 
     def before_instantiate_classes(self) -> None:
         sc = self.config[self.subcommand]
-        sc['trainer.logger.dict_kwargs'] = {'name' : sc['name']}
+
         if self.subcommand == "fit":
-            if sc['trainer.fast_dev_run']:
-                self.save_config_callback = None
-                sc['trainer.logger'] = False
-                sc['trainer.callbacks'] = []
-                return
             # Get timestamped output dir for this run
             timestamp = datetime.now().strftime("%Y%m%d-T%H%M%S")  # noqa: DTZ005
             log = "trainer.logger"
