@@ -64,7 +64,7 @@ class ModelWrapper(LightningModule):
 
             # If the task returned a non-empty metrics dict, log it
             if task_metrics:
-                self.log_dict({f"{stage}/final_{task.name}_{k}": v for k, v in task_metrics.items()}, sync_dist=True)
+                self.log_dict({f"{stage}/final_{task.name}_{k}": v for k, v in task_metrics.items()})
 
     def log_metrics(self, preds, targets, stage):
         # First log any task metrics
@@ -90,9 +90,9 @@ class ModelWrapper(LightningModule):
             self.log_metrics(preds, targets, "train")
 
         # Use Jacobian Descent for Multi Task Learning https://arxiv.org/abs/2406.16232
-        # if self.mtl:
-        #     self.mlt_opt(losses, outputs)
-        #     return None
+        if self.mtl:
+            self.mlt_opt(losses, outputs)
+            return None
 
         return total_loss
 
@@ -140,7 +140,7 @@ class ModelWrapper(LightningModule):
         else:
             raise ValueError(f"Unknown optimizer: {self.opt_config['opt']}")
 
-        opt = optimizer(self.parameters(), lr=self.lrs_config["initial"], weight_decay=self.lrs_config["weight_decay"])
+        opt = optimizer(self.model.parameters(), lr=self.lrs_config["initial"], weight_decay=self.lrs_config["weight_decay"])
 
         if not self.lrs_config.get("skip_scheduler"):
             # Configure the learning rate scheduler
