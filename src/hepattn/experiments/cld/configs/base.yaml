@@ -1,4 +1,4 @@
-name: CLD_5_320_charged_10MeV_noise_neutrals_F16_focal_dice
+name: CLD_5_256_charged_10MeV_single3d_simflag_F16
 
 data:
   # Paths to preprocessed data directories
@@ -20,7 +20,7 @@ data:
   particle_min_pt: 0.01
 
   # Number of query slots / particles to generate per event
-  event_max_num_particles: &num_particles 320
+  event_max_num_particles: &num_particles 256
 
   # Charged particle cuts based on hit content
   charged_particle_min_num_hits:
@@ -47,14 +47,14 @@ data:
   particle_hit_deflection_cuts:
     vtxd:
       max_angle: 0.25
-      max_angle_xy: 0.25
-      max_angle_rz: 0.1
+      max_angle_xy: -1
+      max_angle_rz: -1
       num_passes: 8
     trkr:
       max_angle: 1.0
-      max_angle_xy: 1.0
-      max_angle_rz: 0.2
-      num_passes: 12
+      max_angle_xy: -1
+      max_angle_rz: -1
+      num_passes: 16
 
   # Cuts on maximum distance between subsequent hit
   particle_hit_separation_cuts:
@@ -63,18 +63,18 @@ data:
       num_passes: 8
     trkr:
       max_dist: 1.5
-      num_passes: 12
+      num_passes: 16
 
   # Whether to include charged / neutral particles as targets
   include_charged: true
-  include_neutral: true
+  include_neutral: false
 
-  truth_filter_hits: []
-    #- vtxd
-    #- trkr
-    #- ecal
-    #- hcal
-    #- muon
+  truth_filter_hits:
+    - vtxd
+    - trkr
+    - ecal
+    - hcal
+    - muon
 
   merge_inputs:
     vtxd:
@@ -247,6 +247,14 @@ data:
       - energy_hcal
       - calib_energy_ecal
       - calib_energy_hcal
+      - isOverlay
+      - isStopped
+      - LD
+      - DIC
+      - DIT
+      - VNEP
+      - BS
+      - CIS
 
     particle_vtxd:
       - pos.x
@@ -552,12 +560,12 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 10.0
-                  mask_dice: 10.0
-                  mask_focal: 10.0
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 costs:
                   mask_ce: 10.0
-                  mask_dice: 10.0
-                  mask_focal: 10.0
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -570,12 +578,12 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 10.0
-                  mask_dice: 10.0
-                  mask_focal: 10.0
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 costs:
                   mask_ce: 10.0
-                  mask_dice: 10.0
-                  mask_focal: 10.0
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -588,13 +596,13 @@ model:
                 target_object: particle
                 target_field: energy_frac
                 losses:
-                  mask_ce: 0.1
-                  mask_dice: 0.5
-                  mask_focal: 0.5
+                  mask_ce: 0.5
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 costs:
-                  mask_ce: 0.1
-                  mask_dice: 0.5
-                  mask_focal: 0.5
+                  mask_ce: 0.5
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -608,12 +616,12 @@ model:
                 target_field: energy_frac
                 losses:
                   mask_ce: 0.5
-                  mask_dice: 0.5
-                  mask_focal: 0.5
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 costs:
                   mask_ce: 0.5
-                  mask_dice: 0.5
-                  mask_focal: 0.5
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -626,11 +634,39 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 1.0
-                  mask_dice: 1.0
-                  mask_focal: 1.0
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 costs:
                   mask_ce: 1.0
-                  mask_dice: 1.0
-                  mask_focal: 1.0
+                  mask_dice: 0.0
+                  mask_focal: 0.0
                 dim: *dim
                 null_weight: 1.0
+
+            - class_path: hepattn.models.task.ClassificationTask
+              init_args:
+                name: flow_simstatus_assignment
+                input_object: query
+                output_object: flow
+                target_object: particle
+                classes:
+                  - isOverlay
+                  - isStopped
+                  - LD
+                  - DIC
+                  - DIT
+                  - VNEP
+                  - BS
+                  - CIS
+                dim: *dim
+                class_weights:
+                  isOverlay: 0
+                  isStopped: 0.11
+                  LD: 19.9
+                  DIC: 0.12
+                  DIT: 1.21
+                  VNEP: 0.68
+                  BS: 33.4
+                  CIS: 0.51
+                loss_weight: 1.0
+                multilabel: True

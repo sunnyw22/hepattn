@@ -333,6 +333,33 @@ class CLDDataset(Dataset):
         isolation[np.arange(num_particles), np.arange(num_particles)] = np.inf
         event["particle.isolation"] = np.min(isolation, axis=-1)
 
+        # Add simulator status flag
+        # FLAG_NAMES = {
+        #     30: "CreatedInSimulation" (CIS)
+        #          True if the particle has been created by the simulation program (rather than the generator)
+        #     29: "Backscatter" (BS)
+        #          True if the particle was created by the simulator as a result of an interaction or decay in non-tracking region
+        #     28: "VertexIsNotEndpointOfParent" (VNEP)
+        #          True if the particle was created as a result of a continuous process where the parent particle continues
+        #     27: "DecayedInTracker" (DIT)
+        #          True if the particle decayed or interacted in a tracking region
+        #     26: "DecayedInCalorimeter" (DIC)
+        #          True if the particle decayed or interacted (non-continuous interaction, particle terminated) in non-tracking region
+        #     25: "LeftDetector" (LD)
+        #          True if the particle left the world volume undecayed
+        #     24: "Stopped"
+        #          True if the particle lost all kinetic energy inside the world volume and did not decay.
+        #     23: "Overlay"
+        #          True if the particle has been overlayed by the simulation (or digitization) program.
+        # }
+        sim_status = event["particle.simulatorStatus"].astype(np.uint32)
+        bit_positions = np.array([23, 24, 25, 26, 27, 28, 29, 30]).astype(np.uint32)
+        bit_masks = 1 << bit_positions[:, None]
+        particle_sim_status = ((sim_status[None, :] & bit_masks) > 0).astype(np.bool_).T
+        flag_names = ["isOverlay", "isStopped", "LD", "DIC", "DIT", "VNEP", "BS", "CIS"]
+        for i, name in enumerate(flag_names):
+            event[f"particle.{name}"] = particle_sim_status[:, i]
+
         # Set which particles we deem to be targets / reconstructable
         particle_cuts = {"min_pt": event["particle.mom.r"] >= self.particle_min_pt}
 

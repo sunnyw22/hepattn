@@ -25,9 +25,9 @@ def sigmoid(x):
 
 
 def main():
-    config_path = Path("/home/syw24/ftag/hepattn/logs/CLD_TRKECALHCAL_16_96_TF_charged_10MeV_F16_manypass_20250529-T024522/config.yaml")
+    config_path = Path("/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/config.yaml")
     eval_path = Path(
-        "/home/syw24/ftag/hepattn/logs/CLD_TRKECALHCAL_16_96_TF_charged_10MeV_F16_manypass_20250529-T024522/ckpts/epoch=007-train_loss=0.95565_train_eval.h5"
+        "/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=000-train_loss=3.94384_train_eval.h5"
     )
 
     # Now create the dataset
@@ -55,6 +55,7 @@ def main():
 
     # Which hits sets will be considered in the eval
     hits = ["vtxd", "trkr", "ecal", "hcal"]
+    simstatus_flags = ["isOverlay", "isStopped", "LD", "DIC", "DIT", "VNEP", "BS", "CIS"]
 
     # Where to save all the plots
     plot_save_dir = Path(__file__).resolve().parent / Path("eval_plots")
@@ -96,8 +97,10 @@ def main():
         "mom.qopt": ("$p_T$ [GeV] (qopt)", np.geomspace(0.01, 100.0, 32), "log"),
         "mom.eta": (r"$\eta$", np.linspace(-4, 4, 32), "linear"),
         "mom.phi": (r"$\phi$", np.linspace(-np.pi, np.pi, 32), "linear"),
-        "mom.sinphi": (r"$\sin\phi$", np.linspace(-np.pi, np.pi, 32), "linear"),
-        "mom.cosphi": (r"$\cos\phi$", np.linspace(-np.pi, np.pi, 32), "linear"),
+        "calib_energy_ecal": (r"Total Calibrated ECAL $E$ [GeV]", np.logspace(-3, 2, 32), "log"),
+        "calib_energy_hcal": (r"Total Calibrated HCAL $E$ [GeV]", np.logspace(-3, 2, 32), "log"),
+        # "mom.sinphi": (r"$\sin\phi$", np.linspace(-np.pi, np.pi, 32), "linear"),
+        # "mom.cosphi": (r"$\cos\phi$", np.linspace(-np.pi, np.pi, 32), "linear"),
         "vtx.r": ("Vertex $r_0$ [m]", np.linspace(0.0, 0.05, 32), "linear"),
         "vtx.z": ("Vertex $z_0$ [m]", np.linspace(-0.5, 0.5, 32), "linear"),
         "isolation": (r"$\Delta R$ Isolation", np.logspace(-4, 0, 32), "log"),
@@ -110,10 +113,10 @@ def main():
     particle_total_valid = {hit: {field: np.zeros(len(plot_specs[field][1]) - 1) for field in plot_specs} for hit in hits}
     particle_total_eff = {hit: {field: np.zeros(len(plot_specs[field][1]) - 1) for field in plot_specs} for hit in hits}
 
-    {hit: {field: np.zeros(len(plot_specs[field][1]) - 1) for field in plot_specs} for hit in hits}
-    {hit: {field: np.zeros(len(plot_specs[field][1]) - 1) for field in plot_specs} for hit in hits}
+    simstatus_total_valid = {flag: np.zeros(len(plot_specs["mom.r"][1]) - 1) for flag in simstatus_flags}
+    simstatus_total_eff = {flag: np.zeros(len(plot_specs["mom.r"][1]) - 1) for flag in simstatus_flags}
 
-    for idx in tqdm(range(100)):
+    for idx in tqdm(range(1000)):
         # Load the data from the event
         sample_id = dataset.sample_ids[idx]
 
@@ -159,6 +162,23 @@ def main():
                 particle_total_valid[hit][field] += num_valid
                 particle_total_eff[hit][field] += num_eff
 
+            pt_bins = plot_specs["mom.r"][1]
+
+            for flag in simstatus_flags:
+                sim_flag = np.pad(targets[f"particle_{flag}"], ((0, particle_pad_size),), constant_values=False)
+
+                is_flagged = particle_valid & sim_flag
+                is_flagged_matched = matched & sim_flag
+
+                pt = np.pad(targets["particle_mom.r"], ((0, particle_pad_size),), constant_values=0.0)
+                pt = np.clip(pt, pt_bins[0], pt_bins[-1])
+
+                flagged_sum, _, _ = binned_statistic(pt, is_flagged, statistic="sum", bins=pt_bins)
+                flagged_eff, _, _ = binned_statistic(pt, is_flagged_matched, statistic="sum", bins=pt_bins)
+
+                simstatus_total_valid[flag] += flagged_sum
+                simstatus_total_eff[flag] += flagged_eff
+
     hit_aliases = {
         "vtxd": "VTXD",
         "trkr": "Tracker",
@@ -172,7 +192,7 @@ def main():
             total_valid = particle_total_valid[hit][field]
             total_eff = particle_total_eff[hit][field]
 
-            # Total effieicny is the total number of effieint particles /
+            # Total efficiency is the total number of efficient particles /
             # total number of valid (i.e. reconstructable) particles
             eff = total_eff / total_valid
             eff_errors = bayesian_binomial_error(total_eff, total_valid)
@@ -205,6 +225,26 @@ def main():
         ax.grid(zorder=0, alpha=0.25, linestyle="--")
 
         fig.savefig(plot_save_dir / Path(f"part_{field}.png"))
+
+    for flag in simstatus_flags:
+        total_valid = simstatus_total_valid[flag]
+        total_eff = simstatus_total_eff[flag]
+
+        eff = total_eff / total_valid
+        eff_errors = bayesian_binomial_error(total_eff, total_valid)
+
+        fig, ax = plt.subplots()
+        fig.set_size_inches(8, 3)
+
+        plot_hist_to_ax(ax, eff, pt_bins, eff_errors)
+
+        ax.set_xlabel("$p_T$ [GeV]")
+        ax.set_ylabel(f"Efficiency for {flag}")
+        ax.set_xscale("log")
+        ax.set_ylim(0.0, 1.1)
+        ax.grid(zorder=0, alpha=0.25, linestyle="--")
+
+        fig.savefig(plot_save_dir / Path(f"simflag_eff_{flag}_vs_pt.png"))
 
 
 if __name__ == "__main__":

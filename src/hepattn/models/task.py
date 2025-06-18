@@ -154,7 +154,7 @@ class HitFilterTask(Task):
         self.mask_keys = mask_keys
 
         # Internal
-        self.input_objects = [f"{input_object}_embed"]
+        self.input_objects = [f"{hit_name}_embed"]
         self.net = Dense(dim, 1)
 
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
@@ -174,10 +174,10 @@ class HitFilterTask(Task):
             weight = 1 / target.float().mean()
             loss = nn.functional.binary_cross_entropy_with_logits(output, target, pos_weight=weight)
             return {f"{self.input_object}_{self.loss_fn}": loss}
-        elif self.loss_fn == "focal":
+        if self.loss_fn == "focal":
             loss = focal_loss(output, target)
             return {f"{self.input_object}_{self.loss_fn}": loss}
-        elif self.loss_fn == "both":
+        if self.loss_fn == "both":
             weight = 1 / target.float().mean()
             bce_loss = nn.functional.binary_cross_entropy_with_logits(output, target, pos_weight=weight)
             focal_loss_value = focal_loss(output, target)
@@ -185,8 +185,7 @@ class HitFilterTask(Task):
                 f"{self.input_object}_bce": bce_loss,
                 f"{self.input_object}_focal": focal_loss_value,
             }
-        else:
-            raise ValueError(f"Unknown loss function: {self.loss_fn}")
+        raise ValueError(f"Unknown loss function: {self.loss_fn}")
 
     def key_mask(self, outputs, threshold=0.1):
         if not self.mask_keys:
@@ -439,7 +438,7 @@ class ObjectHitRegressionTask(RegressionTask):
         return x_obj_hit
 
 
-class ClassificationTask(nn.Module):
+class ClassificationTask(Task):
     def __init__(
         self,
         name: str,
@@ -464,6 +463,9 @@ class ClassificationTask(nn.Module):
         self.loss_weight = loss_weight
         self.multilabel = multilabel
 
+        self.inputs = [input_object + "_embed"]
+        self.outputs = [output_object + "_logits"]
+
         self.class_net = Dense(dim, len(classes))
         self.class_weights_values = torch.tensor([class_weights[class_name] for class_name in self.classes])
 
@@ -471,14 +473,11 @@ class ClassificationTask(nn.Module):
         # Now get the class logits from the embedding (..., N, ) -> (..., E)
         x = self.class_net(x[f"{self.input_object}_embed"])
         return {f"{self.output_object}_logits": x}
-    
+
     def predict(self, outputs, threshold=0.5):
         # Split the regression vectior into the separate fields
         logits = outputs[self.output_object + "_logits"]
-        if self.multilabel:
-            predictions = torch.nn.functional.sigmoid(logits) >= threshold
-        else:
-            predictions = torch.nn.functional.softmax(logits, dim=-1)
+        predictions = torch.nn.functional.sigmoid(logits) >= threshold if self.multilabel else torch.nn.functional.softmax(logits, dim=-1)
         return {self.output_object + "_" + class_name: predictions[..., i] for i, class_name in enumerate(self.classes)}
 
     def loss(self, outputs, targets):
@@ -492,5 +491,3 @@ class ClassificationTask(nn.Module):
         # Only consider valid targets
         losses = losses[targets[f"{self.target_object}_valid"]]
         return {"bce": self.loss_weight * losses.mean()}
-
-

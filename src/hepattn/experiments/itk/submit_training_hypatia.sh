@@ -8,7 +8,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=24G
-#SBATCH --output=/share/rcifdata/maxhart/hepattn/src/hepattn/experiments/itk/slurm_logs/slurm-%j.%x.out
+#SBATCH --output=/home/syw24/ftag/hepattn/src/hepattn/experiments/itk/slurm_logs/slurm-%j.%x.out
 
 
 # Comet variables
@@ -39,7 +39,7 @@ echo "Running training script..."
 # Python command that will be run
 # PYTORCH_CMD="python src/hepattn/experiments/itk/run_tracking.py fit --config src/hepattn/experiments/itk/configs/tracking.yaml"
 
-PYTORCH_CMD="python src/hepattn/experiments/itk/run_filtering.py fit --config src/hepattn/experiments/itk/configs/filtering_pixel.yaml"
+PYTORCH_CMD="python src/hepattn/experiments/itk/run_filtering.py fit --config src/hepattn/experiments/itk/configs/filtering.yaml"
 
 # PYTORCH_CMD="python src/hepattn/experiments/itk/run_filtering.py test --config /share/rcifdata/maxhart/hepattn/logs/ITk_pixel_region135_eta4_pt1_20250422-T132414/config.yaml --ckpt_path /share/rcifdata/maxhart/hepattn/logs/ITk_pixel_region135_eta4_pt1_20250422-T132414/ckpts/epoch=029-val_loss=0.40065.ckpt"
 
@@ -49,7 +49,7 @@ PYTORCH_CMD="python src/hepattn/experiments/itk/run_filtering.py fit --config sr
 PIXI_CMD="pixi run $PYTORCH_CMD"
 
 # Apptainer command that runs the pixi command inside the pixi apptainer image
-APPTAINER_CMD="apptainer run --nv --bind /share/rcifdata/maxhart /share/rcifdata/maxhart/hepattn/pixi.sif $PIXI_CMD"
+APPTAINER_CMD="apptainer run --nv --bind /home/syw24 --bind /share/rcifdata/maxhart /home/syw24/ftag/hepattn/pixi.sif $PIXI_CMD"
 
 # Run the final command
 echo "Running command: $APPTAINER_CMD"

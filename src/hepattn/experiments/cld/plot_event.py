@@ -9,7 +9,7 @@ def plot_cld_event_reconstruction(inputs, reconstruction, axes_spec, object_name
     num_axes = len(axes_spec)
 
     fig, ax = plt.subplots(1, num_axes)
-    fig.set_size_inches(8 * num_axes, 8)
+    fig.set_size_inches(10 * num_axes, 10)
 
     ax = [ax] if num_axes == 1 else ax.flatten()
 
@@ -43,7 +43,9 @@ def plot_cld_event_reconstruction(inputs, reconstruction, axes_spec, object_name
                         # Used for sorting the hits in time when we want to plot them in order in the tracker
                         idx = torch.argsort(inputs[f"{input_name}_time"][batch_idx][mask], dim=-1)
 
-                        ax[ax_idx].plot(x[mask][idx], y[mask][idx], color=color, marker="o", alpha=0.75, linewidth=1.0, ms=2.0)
+                        ax[ax_idx].plot(
+                            x[mask][idx], y[mask][idx], color=color, marker="o", alpha=0.75, linewidth=1.0, ms=2.0, label=f"mc_idx: {mcparticle_idx}"
+                        )
 
                         # Uncomment to leave a box denoting particle index for trkr hit
                         # if input_name == "trkr" and mask.any():
@@ -81,6 +83,7 @@ def plot_cld_event_reconstruction(inputs, reconstruction, axes_spec, object_name
             ax[ax_idx].set_xlabel(ax_spec["x"])
             ax[ax_idx].set_ylabel(ax_spec["y"])
             ax[ax_idx].set_aspect("equal", "box")
+            # ax[ax_idx].legend(fontsize=2.75, framealpha=0.5)
 
     return fig
 
@@ -291,13 +294,13 @@ def plot_cld_event_match_vs_mismatch(inputs, truth, preds, axes_spec, object_nam
         ax_matched.set_ylabel(spec["y"])
         ax_matched.set_aspect("equal", "box")
         ax_matched.set_title("Matched Tracks")
-        ax_matched.legend(fontsize=5, framealpha=0.5)
+        ax_matched.legend(fontsize=2.75, framealpha=0.5)
 
         ax_mismatch.set_xlabel(spec["x"])
         ax_mismatch.set_ylabel(spec["y"])
         ax_mismatch.set_aspect("equal", "box")
         ax_mismatch.set_title("Mismatched Tracks")
-        ax_mismatch.legend(fontsize=5, framealpha=0.5)
+        ax_mismatch.legend(fontsize=2.75, framealpha=0.5)
 
     line_truth = mlines.Line2D([], [], color="gray", linestyle="-", marker="o", label="Truth")
     line_pred = mlines.Line2D([], [], color="gray", linestyle="--", marker="x", label="Prediction")
@@ -549,8 +552,8 @@ def plot_cld_event_pre_vs_post(inputs_orig, inputs_post, orig_targets, post_targ
                 ax_mismatch.set_ylabel(spec["y"])
                 ax_mismatch.set_aspect("equal", "box")
 
-        ax_matched.legend(fontsize=5, framealpha=0.5)
-        ax_mismatch.legend(fontsize=5, framealpha=0.5)
+        ax_matched.legend(fontsize=2.75, framealpha=0.5)
+        ax_mismatch.legend(fontsize=2.75, framealpha=0.5)
 
     line_orig = mlines.Line2D([], [], color="gray", linestyle="--", marker="x", label="Original")
     line_pre = mlines.Line2D([], [], color="gray", linestyle="-", marker="o", label="After cuts")

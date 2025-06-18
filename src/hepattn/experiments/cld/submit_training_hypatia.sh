@@ -37,8 +37,9 @@ export TMPDIR=/home/syw24/tmp
 echo "Running training script..."
 
 # Python command that will be run
-CONFIG_PATH="/home/syw24/ftag/hepattn/logs/CLD_10_96_TF_charged_10MeV_F16_regr_sincosphi_20250605-T111602/config.yaml"
-CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLD_10_96_TF_charged_10MeV_F16_regr_sincosphi_20250605-T111602/ckpts/epoch=008-train_loss=4.15202.ckpt"
+# CONFIG_PATH="/home/syw24/ftag/hepattn/src/hepattn/experiments/cld/configs/base.yaml"
+CONFIG_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/config.yaml"
+CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=000-train_loss=3.94384.ckpt"
 # PYTORCH_CMD="python src/hepattn/experiments/cld/main.py fit --config $CONFIG_PATH"
 PYTORCH_CMD="python src/hepattn/experiments/cld/main.py test --config $CONFIG_PATH --ckpt_path $CKPT_PATH"
 
