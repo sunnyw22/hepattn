@@ -1,6 +1,5 @@
 import time
 
-import numpy as np
 import scipy
 import torch
 from torch import nn
@@ -14,16 +13,16 @@ def solve_scipy(cost):
 
 
 def solve_1015_early(cost):
-    return torch.as_tensor(lap1015.lap_late(cost.T))
+    return torch.as_tensor(lap1015.lap_early(cost.T))
 
 
 def solve_1015_late(cost):
     return torch.as_tensor(lap1015.lap_late(cost.T))
 
 
-solvers = {
+SOLVERS = {
     "scipy": solve_scipy,
-    "1015_early": solve_1015_early,
+    # "1015_early": solve_1015_early,
     "1015_late": solve_1015_late,
 }
 
@@ -49,16 +48,10 @@ class Matcher(nn.Module):
         adaptive_check_interval: bool
             Interval for checking which solver is the fastest.
         """
+        if default_solver not in SOLVERS:
+            raise ValueError(f"Unknown solver: {default_solver}. Available solvers: {list(SOLVERS.keys())}")
         self.default_solver = default_solver
-        # self.solver = solvers[default_solver]
-        if default_solver == "scipy":
-            self.solver = solve_scipy
-        elif default_solver == "1015_early":
-            self.solver = solve_1015_early
-        elif default_solver == "1015_late":
-            self.solver = solve_1015_late
-        else:
-            raise ValueError(f"Unknown solver: {default_solver}. Available solvers: {list(solvers.keys())}")
+        self.solver = SOLVERS[default_solver]
         self.adaptive_solver = adaptive_solver
         self.adaptive_check_interval = adaptive_check_interval
         self.step = 0
@@ -70,16 +63,18 @@ class Matcher(nn.Module):
         batch_obj_lengths = torch.sum(pad_mask, dim=1).unsqueeze(-1)
 
         idxs = []
-        self.default_idx = set(range(costs.shape[2]))  # Default indices for the true objects
+        default_idx = set(range(costs.shape[2]))
         # Do the matching sequentially for each example in the batch
         for k in range(len(costs)):
-            C = costs[k][:, : batch_obj_lengths[k]]  # Get the cost matrix for the k-th element in batch
-            pred_idx = self.solver(C)  # Solve the assignment problem
+            # Get the cost matrix for the k-th element in batch and solve the assignment
+            cost = costs[k][:, : batch_obj_lengths[k]]
+            pred_idx = self.solver(cost)
+
+            # scipy returns incomplete assignments, handle that here
             if self.default_solver == "scipy":
-                # Create full assignment
                 full_col_idx = torch.empty(costs.shape[2], dtype=torch.long)
                 full_col_idx[: batch_obj_lengths[k]] = pred_idx
-                full_col_idx[batch_obj_lengths[k] :] = torch.tensor(list(self.default_idx - set(pred_idx.numpy())), dtype=torch.long)
+                full_col_idx[batch_obj_lengths[k] :] = torch.tensor(list(default_idx - set(pred_idx.numpy())), dtype=torch.long)
                 pred_idx = full_col_idx
 
             # These indicies can be used to permute the predictions so they now match the truth objects
@@ -92,11 +87,11 @@ class Matcher(nn.Module):
     @torch.no_grad()
     def forward(self, costs, pad_mask=None):
         # Cost matrix dimensions are batch, pred, true
-        # Have to detach and move the tensor from GPU to CPU then convert to numpy so we can use SciPy matcher
+        # Have to detach and move the tensor from GPU to CPU then convert to numpy first
         device = costs.device
         costs = costs.detach().to(torch.float32)
-        costs = torch.nan_to_num(costs, nan=1e6, posinf=1e6, neginf=1e6).cpu()
-        costs = costs.numpy()
+        costs = torch.nan_to_num(costs, nan=1e6, posinf=1e6, neginf=1e6)
+        costs = costs.cpu().numpy()
         pred_idxs = self.compute_matching(costs, pad_mask=pad_mask)
 
         self.step += 1
@@ -113,15 +108,15 @@ class Matcher(nn.Module):
         solver_times = {}
 
         # For each solver, compute the time to match the entire batch
-        for solver_name, solver in solvers.items():
+        for solver_name, solver in SOLVERS.items():
             # Switch to the solver we are testing
             self.solver = solver
-            t_start = time.time()
+            start_time = time.time()
             self.compute_matching(costs)
-            solver_times[solver_name] = time.time() - t_start
+            solver_times[solver_name] = time.time() - start_time
 
         # Get the solver that was the fastest
         fastest_solver = min(solver_times, key=solver_times.get)
 
         # Set the new solver to be the solver with the fastest time for the cost batch
-        self.solver = solvers[fastest_solver]
+        self.solver = SOLVERS[fastest_solver]
