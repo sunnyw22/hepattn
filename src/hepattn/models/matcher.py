@@ -79,6 +79,7 @@ class Matcher(nn.Module):
 
             # These indicies can be used to permute the predictions so they now match the truth objects
             idxs.append(pred_idx)
+
         # Stack the indices into a tensor
         pred_idxs = torch.stack(idxs)
 
