@@ -247,9 +247,6 @@ class MaskFormer(nn.Module):
             layer_costs = None
             # Get the cost contribution from each of the tasks
             for task in self.tasks:
-                if task.do_inter_loss == False and layer_name != "final":
-                    # Skip tasks that do not contribute to the intermediate loss
-                    continue
                 # Only use the cost from the final set of predictions
                 task_costs = task.cost(layer_outputs[task.name], targets)
 
@@ -281,9 +278,6 @@ class MaskFormer(nn.Module):
                 continue
             losses[layer_name] = {}
             for task in self.tasks:
-                if task.do_inter_loss == False and layer_name != "final":
-                    # Skip tasks that do not contribute to the intermediate loss
-                    continue
                 losses[layer_name][task.name] = task.loss(outputs[layer_name], targets)
 
         return losses

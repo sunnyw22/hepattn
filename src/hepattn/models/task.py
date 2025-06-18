@@ -6,17 +6,16 @@ from torch import Tensor, nn
 
 from hepattn.models.dense import Dense
 from hepattn.models.loss import cost_fns, focal_loss, loss_fns
-from hepattn.utils.scaling import FeatureScaler
 from hepattn.utils.masks import topk_attn
+from hepattn.utils.scaling import FeatureScaler
 
 # Pick a value that is safe for float16
 COST_PAD_VALUE = 1e4
 
 
 class Task(nn.Module, ABC):
-    def __init__(self, do_inter_loss: bool = True):
+    def __init__(self):
         super().__init__()
-        self.do_inter_loss = do_inter_loss
 
     @abstractmethod
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
@@ -310,9 +309,8 @@ class RegressionTask(Task):
         target_object: str,
         fields: list[str],
         loss_weight: float,
-        do_inter_loss: bool = True,
     ):
-        super().__init__(do_inter_loss=do_inter_loss)
+        super().__init__()
 
         self.name = name
         self.output_object = output_object
@@ -552,10 +550,9 @@ class IncidenceRegressionTask(Task):
         costs: dict[str, float],
         net: nn.Module,
         node_net: nn.Module | None = None,
-        do_inter_loss: bool = True,
     ):
         """Incidence regression task."""
-        super().__init__(do_inter_loss=do_inter_loss)
+        super().__init__()
         self.name = name
         self.input_hit = input_hit
         self.input_object = input_object
@@ -623,7 +620,6 @@ class IncidenceBasedRegressionTask(RegressionTask):
         scale_dict_path: str,
         net: nn.Module,
         use_incidence: bool = True,
-        do_inter_loss: bool = False,
         use_nodes: bool = False,
         split_charge_neutral_loss: bool = False,
     ):
@@ -636,14 +632,7 @@ class IncidenceBasedRegressionTask(RegressionTask):
         add_momentum : bool
             Whether to add scalar momentum to the predictions, computed from the px, py, pz predictions
         """
-        super().__init__(
-            name=name,
-            output_object=output_object,
-            target_object=target_object,
-            fields=fields,
-            loss_weight=loss_weight,
-            do_inter_loss=do_inter_loss,
-        )
+        super().__init__(name=name, output_object=output_object, target_object=target_object, fields=fields, loss_weight=loss_weight)
         self.input_hit = input_hit
         self.input_object = input_object
         self.scaler = FeatureScaler(scale_dict_path=scale_dict_path)

@@ -54,6 +54,7 @@ model:
             num_heads: 16
 
       num_decoder_layers: 4
+      intermediate_losses: false
       decoder_layer_config:
         dim: *dim
         mask_attention: true
@@ -124,7 +125,6 @@ model:
                   kl_div: 1
                 costs:
                   kl_div: 1
-                do_inter_loss: false
                 net:
                   class_path: hepattn.models.Dense
                   init_args:
@@ -150,7 +150,6 @@ model:
                 target_object: particle
                 loss_weight: 1.0
                 cost_weight: 1.0
-                do_inter_loss: false
                 use_incidence: true
                 use_nodes: true
                 split_charge_neutral_loss: true
