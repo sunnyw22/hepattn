@@ -10,7 +10,7 @@ from hepattn.models.attention import Attention
 from hepattn.models.dense import Dense
 from hepattn.models.norm import LayerNorm
 
-# create_block_mask = torch.compile(create_block_mask, dynamic=True)
+create_block_mask = torch.compile(create_block_mask, dynamic=True)
 
 SCORE_MODS = {
     "relative_position": relative_position,
@@ -52,7 +52,7 @@ class Residual(nn.Module):
         self,
         fn: nn.Module,
         dim: int,
-        norm: str | None = None,
+        norm: str | None,
         post_norm: bool = False,
         layer_scale: float | None = None,
         drop_path: float = 0.0,
@@ -84,9 +84,7 @@ class Residual(nn.Module):
             except AttributeError as e:
                 raise ValueError(f"Unsupported norm: {norm}. Must be a valid torch.nn module.") from e
         elif norm is None:
-            self.norm = nn.LayerNorm(dim, elementwise_affine=False)
-        elif issubclass(norm, LayerNorm):
-            self.norm = norm(dim)
+            self.norm = nn.Identity()
         else:
             raise ValueError(f"Unsupported norm: {norm}. Must be a string or None.")
 
