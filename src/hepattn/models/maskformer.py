@@ -14,10 +14,12 @@ class MaskFormer(nn.Module):
         tasks: nn.ModuleList,
         num_queries: int,
         dim: int,
+        pooling: nn.Module | None = None,
         matcher: nn.Module | None = None,
         input_sort_field: str | None = None,
         use_attn_masks: bool = True,
         use_query_masks: bool = True,
+        intermediate_losses: bool = True,
     ):
         """
         Initializes the MaskFormer model, which is a modular transformer-style architecture designed
@@ -43,12 +45,19 @@ class MaskFormer(nn.Module):
             The dimensionality of the query and key embeddings.
         input_sort_field : str or None, optional
             An optional key used to sort the input objects (e.g., for windowed attention).
+        use_attn_masks : bool, optional
+            If True, attention masks will be used to control which input objects are attended to.
+        use_query_masks : bool, optional
+            If True, query masks will be used to control which queries are valid during attention.
+        intermediate_losses : bool, optional
+            If True, intermediate losses will be applied at each decoder layer.
         """
         super().__init__()
 
         self.input_nets = input_nets
         self.encoder = encoder
         self.decoder_layers = nn.ModuleList([MaskFormerDecoderLayer(**decoder_layer_config) for _ in range(num_decoder_layers)])
+        self.pooling = pooling
         self.tasks = tasks
         self.matcher = matcher
         self.num_queries = num_queries
@@ -56,6 +65,7 @@ class MaskFormer(nn.Module):
         self.input_sort_field = input_sort_field
         self.use_attn_masks = use_attn_masks
         self.use_query_masks = use_query_masks
+        self.intermediate_losses = intermediate_losses
 
     def forward(self, inputs: dict[str, Tensor]) -> dict[str, Tensor]:
         # Atomic input names
@@ -84,6 +94,14 @@ class MaskFormer(nn.Module):
         x["key_embed"] = torch.concatenate([x[input_name + "_embed"] for input_name in input_names], dim=-2)
         x["key_valid"] = torch.concatenate([x[input_name + "_valid"] for input_name in input_names], dim=-1)
 
+        # calculate the batch size and combined number of input constituents
+        batch_size = x["key_valid"].shape[0]
+        num_constituents = x["key_valid"].shape[-1]
+
+        # if all key_valid are true, then we can just set it to None
+        if batch_size == 1 and x["key_valid"].all():
+            x["key_valid"] = None
+
         # Also merge the field being used for sorting in window attention if requested
         if self.input_sort_field is not None:
             x[f"key_{self.input_sort_field}"] = torch.concatenate(
@@ -101,9 +119,12 @@ class MaskFormer(nn.Module):
             x[input_name + "_embed"] = x["key_embed"][..., x[f"key_is_{input_name}"], :]
 
         # Generate the queries that represent objects
-        batch_size = x["key_valid"].shape[0]
         x["query_embed"] = self.query_initial.expand(batch_size, -1, -1)
-        x["query_valid"] = torch.full((batch_size, self.num_queries), True)
+        x["query_valid"] = torch.full((batch_size, self.num_queries), True, device=x["query_embed"].device)
+
+        # Do any pooling if desired
+        if self.pooling is not None:
+            x = x | self.pooling(x)
 
         # Pass encoded inputs through decoder to produce outputs
         outputs = {}
@@ -140,7 +161,7 @@ class MaskFormer(nn.Module):
 
             # Fill in attention masks for features that did not get one specified by any task
             if attn_masks and self.use_attn_masks:
-                attn_mask = torch.full((batch_size, self.num_queries, x["key_valid"].shape[-1]), True, device=x["key_embed"].device)
+                attn_mask = torch.full((batch_size, self.num_queries, num_constituents), True, device=x["key_embed"].device)
 
                 for input_name, input_attn_mask in attn_masks.items():
                     attn_mask[..., x[f"key_is_{input_name}"]] = input_attn_mask
@@ -157,6 +178,10 @@ class MaskFormer(nn.Module):
             # Unmerge the updated features back into the separate input types
             for input_name in input_names:
                 x[input_name + "_embed"] = x["key_embed"][..., x[f"key_is_{input_name}"], :]
+
+            # Do any pooling if desired
+            if self.pooling is not None:
+                x = x | self.pooling(x)
 
         # Get the final outputs - we don't need to compute attention masks or update things here
         outputs["final"] = {}
@@ -202,6 +227,9 @@ class MaskFormer(nn.Module):
         # Will hold the costs between all pairs of objects - cost axes are (batch, pred, true)
         costs = {}
         for layer_name, layer_outputs in outputs.items():
+            if not self.intermediate_losses and layer_name != "final":
+                continue
+
             layer_costs = None
             # Get the cost contribution from each of the tasks
             for task in self.tasks:
@@ -219,18 +247,27 @@ class MaskFormer(nn.Module):
 
         # Permute the outputs for each output in each layer
         for layer_name in outputs:
+            if not self.intermediate_losses and layer_name != "final":
+                continue
             # Get the indicies that can permute the predictions to yield their optimal matching
             pred_idxs = self.matcher(costs[layer_name])
             batch_idxs = torch.arange(costs[layer_name].shape[0]).unsqueeze(1).expand(-1, self.num_queries)
 
             # Apply the permutation in place
             for task in self.tasks:
+                # Some tasks, such as hit-level or sample-level tasks, do not need permutation
+                if hasattr(task, "permute_loss"):
+                    if not task.permute_loss:
+                        continue
+
                 for output_name in task.outputs:
                     outputs[layer_name][task.name][output_name] = outputs[layer_name][task.name][output_name][batch_idxs, pred_idxs]
 
         # Compute the losses for each task in each block
         losses = {}
         for layer_name in outputs:
+            if not self.intermediate_losses and layer_name != "final":
+                continue
             losses[layer_name] = {}
             for task in self.tasks:
                 losses[layer_name][task.name] = task.loss(outputs[layer_name][task.name], targets)

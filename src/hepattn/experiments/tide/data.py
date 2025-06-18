@@ -103,15 +103,15 @@ class ROIDataset(Dataset):
         # At the start, we load enough files so that we will have enough for the requested sample size
         # As we read through the dataset, some ROIs will be discarded, and so we will load more
         # files on-demand then as we need
-        total_num_rois = 0
         for file_path in self.available_file_paths:
             self.register_file(file_path)
-            total_num_rois += len(self.roi_id_to_file_path)
+            total_num_rois = len(self.roi_id_to_file_path)
 
-            if total_num_rois >= self.num_samples:
-                print(f"Finished registering {total_num_rois} ROIs from {len(self.file_paths)} files")
+            if len(self.roi_id_to_file_path) >= self.num_samples:
                 break
 
+        print(f"Finished registering {len(self.roi_id_to_file_path)} ROIs from {len(self.file_paths)} files")
+        
     def register_file(self, file_path):
         with h5py.File(file_path, "r") as file:
             roi_ids = list(file.keys())
@@ -180,7 +180,7 @@ class ROIDataset(Dataset):
                 "tau": [4, 5],
                 "other": [6],
             }
-            
+
             for track in ["sudo", "sisp", "reco"]:
                 # Load in track fields
                 for field in ["pt", "eta", "phi", "z0", "d0", "vx", "vy", "vz", "q", "origin"]:
@@ -217,7 +217,7 @@ class ROIDataset(Dataset):
                 roi[f"roi_has_{origin_class}"] = np.any(roi[f"sudo_from_{origin_class}"], keepdims=True)
 
             # roi["roi_has_b"] = np.any(roi[f"sudo_bhad_pt"] >= 5.0, keepdims=True)
-            
+
             # Used to keep track of which ROIs have already been assigned a label for the labelling priority
             assigned_class = np.array([False])
             for origin_class in track_orgin_class_ids:
@@ -311,9 +311,13 @@ class ROIDataset(Dataset):
                 # Mark the hits as valid inputs
                 roi[f"{hit}_valid"] = np.full_like(roi[f"{hit}_x"], True)
 
-            # Add the charge and log charge for the pixel
-            roi[f"pix_charge"] = file[f"{roi_id}/pix_charge"][:]
-            roi[f"pix_log_charge"] = np.log10(1.0 + np.clip(roi[f"pix_charge"], a_min=0.0, a_max=1e12))
+                # Add layer and BEC info
+                roi[f"{hit}_bec"] = file[f"{roi_id}/{hit}_bec"][:]
+                roi[f"{hit}_layer"] = file[f"{roi_id}/{hit}_layer"][:]
+
+                # Add charge info
+                roi[f"{hit}_charge"] = file[f"{roi_id}/{hit}_charge"][:]
+                roi[f"{hit}_log_charge"] = np.log10(1.0 + np.clip(roi[f"{hit}_charge"], a_min=0.0, a_max=1e12))
 
             # Pixel specific fields
             for field in ["lshift", "pitches"]:
@@ -342,6 +346,24 @@ class ROIDataset(Dataset):
             # Drop any ROIs that dropped more tracks than allowed
             if num_dropped_tracks > self.roi_max_num_dropped_tracks:
                 return None
+
+            # Calculate track summary statistics
+            for track in ["sudo", "sisp", "reco"]:
+                for hit in ["pix", "sct"]:
+                    # Number of hits
+                    roi[f"{track}_num_{hit}"] = roi[f"{track}_{hit}_valid"].sum(-1)
+                    # Number of shared hits
+                    hit_is_shared = roi[f"{track}_{hit}_valid"].sum(-2) > 1
+                    roi[f"{track}_num_shared_{hit}"] = (roi[f"{track}_{hit}_valid"] & hit_is_shared[None, :]).sum(-1)
+                
+                # Number of hits on pixel layers
+                for layer in [0, 1, 2]:
+                    pix_on_layer = np.isclose(roi["pix_layer"], layer) # Avoid FPE
+                    pix_is_shared = roi[f"{track}_pix_valid"].sum(-2) > 1
+                    pix_shared_on_layer = pix_on_layer & pix_is_shared
+                    
+                    roi[f"{track}_num_layer_{layer}_pix"] = (roi[f"{track}_pix_valid"] & pix_on_layer[None, :]).sum(-1)
+                    roi[f"{track}_num_shared_layer_{layer}_pix"] = (roi[f"{track}_pix_valid"] & pix_shared_on_layer[None, :]).sum(-1)
 
             # Drop any invalid track slots
             for track in ["sudo", "sisp", "reco"]:
@@ -469,13 +491,16 @@ class ROICollator:
                 size = (self.max_num_obj, hit_max_sizes[hit])
 
             k = f"{target_name}_valid"
-            batched_targets[k] = pad_and_concat([t[k] for t in targets], size, False)
+            if target_name == "roi":
+                batched_targets[k] = torch.cat([t[k] for t in targets]).squeeze(-1)
+            else:
+                batched_targets[k] = pad_and_concat([t[k] for t in targets], size, False)
 
             for field in fields:
                 k = f"{target_name}_{field}"
 
                 if target_name == "roi":
-                    batched_targets[k] = torch.cat([t[k] for t in targets], dim=-1)
+                    batched_targets[k] = torch.cat([t[k] for t in targets]).squeeze(-1)
                 else:
                     batched_targets[k] = pad_and_concat([t[k] for t in targets], size, torch.nan)
 
