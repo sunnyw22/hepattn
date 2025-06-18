@@ -3,7 +3,6 @@ import torch.nn.functional as F
 
 
 def object_bce_loss(pred_logits, true, mask=None, weight=None):  # noqa: ARG001
-    # TODO: Add support for mask?
     losses = F.binary_cross_entropy_with_logits(pred_logits, true, weight=weight)
     return losses.mean()
 
@@ -17,7 +16,7 @@ def object_bce_costs(pred_logits, true):
     return costs
 
 
-def object_ce_loss(pred_probs, true, mask=None, weight=None):
+def object_ce_loss(pred_probs, true, mask=None, weight=None):  # noqa: ARG001
     losses = F.cross_entropy(pred_probs.flatten(0, 1), true.flatten(0, 1), weight=weight)
     return losses.mean()
 
@@ -31,7 +30,7 @@ def object_ce_costs(pred_probs, true):
     return costs
 
 
-def mask_dice_loss(pred_logits, true, mask=None, weight=None, eps=1):
+def mask_dice_loss(pred_logits, true, mask=None, weight=None, eps=1):  # noqa: ARG001
     if mask is not None:
         pred_logits = pred_logits[mask]
         true = true[mask]
@@ -72,7 +71,7 @@ def mask_iou_costs(pred_logits, true, eps=1e-6):
     return costs
 
 
-def focal_loss(pred_logits, targets, balance=False, gamma=2.0, mask=None, weight=None):
+def focal_loss(pred_logits, targets, balance=False, gamma=2.0, mask=None, weight=None):  # noqa: ARG001
     # Not calculate the loss for the padded elements
     if mask is not None:
         pred_logits = pred_logits[mask]
@@ -92,13 +91,13 @@ def mask_focal_costs(pred_logits, true, alpha=-1.0, gamma=2.0):
     focal_pos = ((1 - prob) ** gamma) * F.binary_cross_entropy_with_logits(pred_logits, torch.ones_like(pred_logits), reduction="none")
     focal_neg = (prob**gamma) * F.binary_cross_entropy_with_logits(pred_logits, torch.zeros_like(pred_logits), reduction="none")
     if alpha >= 0:
-        focal_pos = focal_pos * alpha
-        focal_neg = focal_neg * (1 - alpha)
+        focal_pos *= alpha
+        focal_neg *= 1 - alpha
     loss = torch.einsum("bnc,bmc->bnm", focal_pos, true) + torch.einsum("bnc,bmc->bnm", focal_neg, (1 - true))
     return loss / pred_logits.shape[2]
 
 
-def mask_ce_loss(pred_logits, true, mask=None, weight=None):
+def mask_bce_loss(pred_logits, true, mask=None, weight=None):
     # Not calculate the loss for the padded elements
     if mask is not None:
         pred_logits = pred_logits[mask]
@@ -111,16 +110,16 @@ def mask_ce_loss(pred_logits, true, mask=None, weight=None):
     return losses.sum() / len(pred_logits)
 
 
-# Context manager necessary to overwride global autocast to ensure float32 cost is returned
-# @torch.autocast(device_type="cuda", enabled=False)
-def mask_ce_costs(pred_logits, true):
+def mask_bce_costs(pred_logits, true):
+    pred_logits = torch.clamp(pred_logits, -100, 100)
+
     pos = F.binary_cross_entropy_with_logits(pred_logits, torch.ones_like(pred_logits), reduction="none")
     neg = F.binary_cross_entropy_with_logits(pred_logits, torch.zeros_like(pred_logits), reduction="none")
     loss = torch.einsum("bnc,bmc->bnm", pos, true) + torch.einsum("bnc,bmc->bnm", neg, (1 - true))
     return loss / pred_logits.shape[2]
 
 
-def kl_div_loss(pred_logits, true, mask=None, weight=None):
+def kl_div_loss(pred_logits, true, mask=None, weight=None):  # noqa: ARG001
     loss = -true * torch.log(pred_logits + 1e-8)
     if mask is not None:
         loss = loss[mask]
@@ -152,7 +151,7 @@ def regr_smooth_l1_costs(pred, true):
 cost_fns = {
     "object_bce": object_bce_costs,
     "object_ce": object_ce_costs,
-    "mask_ce": mask_ce_costs,
+    "mask_bce": mask_bce_costs,
     "mask_dice": mask_dice_costs,
     "mask_focal": mask_focal_costs,
     "mask_iou": mask_iou_costs,
@@ -162,7 +161,7 @@ cost_fns = {
 loss_fns = {
     "object_bce": object_bce_loss,
     "object_ce": object_ce_loss,
-    "mask_ce": mask_ce_loss,
+    "mask_bce": mask_bce_loss,
     "mask_dice": mask_dice_loss,
     "mask_focal": focal_loss,
     "kl_div": kl_div_loss,

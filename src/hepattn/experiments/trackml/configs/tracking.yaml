@@ -200,11 +200,11 @@ model:
                 output_object: track
                 target_object: particle
                 losses:
-                  #mask_ce: 100.0
+                  #mask_bce: 100.0
                   mask_dice: 2.0
                   mask_focal: 50.0
                 costs:
-                  #mask_ce: 100.0
+                  #mask_bce: 100.0
                   mask_dice: 2.0
                   mask_focal: 50.0
                 dim: *dim
