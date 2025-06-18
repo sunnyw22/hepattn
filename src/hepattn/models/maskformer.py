@@ -61,8 +61,7 @@ class MaskFormer(nn.Module):
         self.tasks = tasks
         self.matcher = matcher
         self.num_queries = num_queries
-        self.query_initial = nn.Parameter(torch.empty((num_queries, dim)))
-        nn.init.normal_(self.query_initial)
+        self.query_initial = nn.Parameter(torch.randn(num_queries, dim))
         self.input_sort_field = input_sort_field
         self.use_attn_masks = use_attn_masks
         self.use_query_masks = use_query_masks
