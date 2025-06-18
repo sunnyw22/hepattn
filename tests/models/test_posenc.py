@@ -3,8 +3,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import torch
 
-from hepattn.models.posenc import PositionEncoder, pos_enc, pos_enc_symmetric, FourierPositionEncoder
-
+from hepattn.models.posenc import FourierPositionEncoder, PositionEncoder, pos_enc, pos_enc_symmetric
 
 def test_pos_enc():
     xs = torch.linspace(-torch.pi, torch.pi, 1000)

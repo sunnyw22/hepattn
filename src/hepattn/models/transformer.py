@@ -79,15 +79,16 @@ class Residual(nn.Module):
         self.post_norm = post_norm
 
         if isinstance(norm, str):
-            self.norm = getattr(nn, norm)(dim, elementwise_affine=False)
+            try:
+                self.norm = getattr(nn, norm)(dim, elementwise_affine=False)
+            except AttributeError as e:
+                raise ValueError(f"Unsupported norm: {norm}. Must be a valid torch.nn module.") from e
         elif norm is None:
             self.norm = nn.LayerNorm(dim, elementwise_affine=False)
         elif issubclass(norm, LayerNorm):
             self.norm = norm(dim)
         else:
-            # TODO: Find whatever is passing type args instead of str
-            self.norm = LayerNorm(dim)
-            print(f"Got unrecognised norm layer {norm}, defaulting to {self.norm}")
+            raise ValueError(f"Unsupported norm: {norm}. Must be a string or None.")
 
     def forward(self, x: Tensor, **kwargs) -> Tensor:
         if self.post_norm:
@@ -101,7 +102,7 @@ class EncoderLayer(nn.Module):
         self,
         dim: int,
         depth: int = 0,
-        norm: str | None = None,
+        norm: str = 'LayerNorm',
         layer_scale: float | None = None,
         drop_path: float = 0.0,
         value_residual: bool = False,
@@ -136,7 +137,6 @@ class EncoderLayer(nn.Module):
 
         attn_kwargs = attn_kwargs or {}
         dense_kwargs = dense_kwargs or {}
-        norm = norm or "LayerNorm"
 
         # handle hybridnorm
         qkv_norm = hybrid_norm
@@ -210,6 +210,12 @@ class Encoder(nn.Module):
 
         self.layers = torch.nn.ModuleList([EncoderLayer(dim=dim, depth=i, **layer_kwargs) for i in range(num_layers)])
 
+    def set_backend(self, attn_type: str):
+        self.attn_type = attn_type
+        layer: EncoderLayer
+        for layer in self.layers:
+            self.attn_type = layer.attn.fn.set_backend(self.attn_type)
+
     def forward(self, x: Tensor, x_sort_value: Tensor | None = None, **kwargs) -> Tensor:
         # If value to sort on is provided, use it to sort the tokens
         # We don't need to use the stable sort assuming that the sort values are unique
@@ -252,3 +258,15 @@ class Encoder(nn.Module):
             x = torch.gather(x, -2, x_unsort_idx.unsqueeze(-1).expand_as(x))
 
         return x
+
+
+def change_attn_backends(module: nn.Module, backend: str) -> None:
+    """Recursively change the attention backend of a module and all its children."""
+    if isinstance(module, Encoder):
+        module.set_backend(backend)
+        return
+    if isinstance(module, Attention):
+        module.set_backend(backend)
+        return
+    for child in module.children():
+        change_attn_backends(child, backend)
