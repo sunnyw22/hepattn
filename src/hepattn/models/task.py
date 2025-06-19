@@ -154,7 +154,8 @@ class HitFilterTask(Task):
         self.mask_keys = mask_keys
 
         # Internal
-        self.input_objects = [f"{hit_name}_embed"]
+        self.input_object = hit_name
+        self.output_object = hit_name
         self.net = Dense(dim, 1)
 
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:

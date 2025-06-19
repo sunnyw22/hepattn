@@ -419,7 +419,7 @@ class CLDDataset(Dataset):
 
                 # Requires it to pass one of the cut
                 # TODO: Removing the 3d angle and only use the xy and rz angle
-                angle_diff_or = (angle_diff <= cut["max_angle"]) | (angle_diff_xy <= cut["max_angle_xy"]) | (angle_diff_rz <= cut["max_angle_rz"])
+                angle_diff_or = (angle_diff <= cut["max_angle"]) | (angle_diff_xy <= cut["max_angle_xy"]) & (angle_diff_rz <= cut["max_angle_rz"])
                 event[f"particle_{item_name}_valid"] = event[f"particle_{item_name}_valid"] & angle_diff_or
 
         # Apply hit cuts based on distance between consecutive hits on particles

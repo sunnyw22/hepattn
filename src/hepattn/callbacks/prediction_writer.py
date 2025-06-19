@@ -38,7 +38,7 @@ class PredictionWriter(Callback):
         self.dataset = trainer.datamodule.test_dataloader().dataset
 
         # Open the handle for writing to the file
-        self.file = h5py.File(self.output_path, "w")
+        # self.file = h5py.File(self.output_path, "w")
 
     @property
     def output_path(self) -> Path:
@@ -47,6 +47,10 @@ class PredictionWriter(Callback):
         out_basename = str(Path(self.trainer.ckpt_path).stem)
         split = Path(self.dataset.dirpath).name
         return Path(out_dir / f"{out_basename}_{split}_eval.h5")
+
+    def on_test_start(self, trainer: Trainer, module: LightningModule) -> None:
+        # Open the handle for writing to the file
+        self.file = h5py.File(self.output_path, "w")
 
     def on_test_batch_end(self, trainer, pl_module, test_step_outputs, batch, batch_idx):
         inputs, targets = batch

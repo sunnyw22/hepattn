@@ -46,14 +46,14 @@ data:
   # Cuts on maximum deflection between subsequent hits
   particle_hit_deflection_cuts:
     vtxd:
-      max_angle: 0.25
-      max_angle_xy: -1
-      max_angle_rz: -1
+      max_angle: -1
+      max_angle_xy: 0.25
+      max_angle_rz: 0.25
       num_passes: 8
     trkr:
-      max_angle: 1.0
-      max_angle_xy: -1
-      max_angle_rz: -1
+      max_angle: -1
+      max_angle_xy: 1.25
+      max_angle_rz: 0.175
       num_passes: 16
 
   # Cuts on maximum distance between subsequent hit
@@ -67,14 +67,14 @@ data:
 
   # Whether to include charged / neutral particles as targets
   include_charged: true
-  include_neutral: false
+  include_neutral: true
 
-  truth_filter_hits:
-    - vtxd
-    - trkr
-    - ecal
-    - hcal
-    - muon
+  truth_filter_hits: []
+    # - vtxd
+    # - trkr
+    # - ecal
+    # - hcal
+    # - muon
 
   merge_inputs:
     vtxd:

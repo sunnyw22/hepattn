@@ -4,7 +4,7 @@
 #SBATCH -p GPU
 #SBATCH --nodes=1
 #SBATCH --export=ALL
-#SBATCH --gres=gpu:a100:1
+#SBATCH --gres=gpu:l40s:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=24G
@@ -27,7 +27,7 @@ echo "nvidia-smi:"
 nvidia-smi
 
 # Move to workdir
-cd /share/rcifdata/maxhart/hepattn/
+cd /home/syw24/ftag/hepattn
 echo "Moved dir, now in: ${PWD}"
 
 # Set tmpdir
