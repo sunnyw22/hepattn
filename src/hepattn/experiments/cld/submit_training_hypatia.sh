@@ -39,7 +39,7 @@ echo "Running training script..."
 # Python command that will be run
 # CONFIG_PATH="/home/syw24/ftag/hepattn/src/hepattn/experiments/cld/configs/base.yaml"
 CONFIG_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/config.yaml"
-CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=001-train_loss=3.33707.ckpt"
+CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=002-train_loss=2.91483.ckpt"
 # PYTORCH_CMD="python src/hepattn/experiments/cld/main.py fit --config $CONFIG_PATH"
 PYTORCH_CMD="python src/hepattn/experiments/cld/main.py test --config $CONFIG_PATH --ckpt_path $CKPT_PATH"
 

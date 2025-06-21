@@ -27,7 +27,7 @@ def sigmoid(x):
 def main():
     config_path = Path("/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/config.yaml")
     eval_path = Path(
-        "/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=000-train_loss=3.94384_train_eval.h5"
+        "/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=002-train_loss=2.91483_train_eval.h5"
     )
 
     # Now create the dataset
@@ -116,6 +116,9 @@ def main():
     simstatus_total_valid = {flag: np.zeros(len(plot_specs["mom.r"][1]) - 1) for flag in simstatus_flags}
     simstatus_total_eff = {flag: np.zeros(len(plot_specs["mom.r"][1]) - 1) for flag in simstatus_flags}
 
+    simstatus_hit_valid = {flag: {hit: np.zeros(len(plot_specs["mom.r"][1]) - 1) for hit in hits} for flag in simstatus_flags}
+    simstatus_hit_eff = {flag: {hit: np.zeros(len(plot_specs["mom.r"][1]) - 1) for hit in hits} for flag in simstatus_flags}
+
     for idx in tqdm(range(1000)):
         # Load the data from the event
         sample_id = dataset.sample_ids[idx]
@@ -163,6 +166,8 @@ def main():
                 particle_total_eff[hit][field] += num_eff
 
             pt_bins = plot_specs["mom.r"][1]
+            pt = np.pad(targets["particle_mom.r"], ((0, particle_pad_size),), constant_values=0.0)
+            pt = np.clip(pt, pt_bins[0], pt_bins[-1])
 
             for flag in simstatus_flags:
                 sim_flag = np.pad(targets[f"particle_{flag}"], ((0, particle_pad_size),), constant_values=False)
@@ -170,14 +175,14 @@ def main():
                 is_flagged = particle_valid & sim_flag
                 is_flagged_matched = matched & sim_flag
 
-                pt = np.pad(targets["particle_mom.r"], ((0, particle_pad_size),), constant_values=0.0)
-                pt = np.clip(pt, pt_bins[0], pt_bins[-1])
-
-                flagged_sum, _, _ = binned_statistic(pt, is_flagged, statistic="sum", bins=pt_bins)
+                flagged_valid, _, _ = binned_statistic(pt, is_flagged, statistic="sum", bins=pt_bins)
                 flagged_eff, _, _ = binned_statistic(pt, is_flagged_matched, statistic="sum", bins=pt_bins)
 
-                simstatus_total_valid[flag] += flagged_sum
+                simstatus_total_valid[flag] += flagged_valid
                 simstatus_total_eff[flag] += flagged_eff
+
+                simstatus_hit_valid[flag][hit] += flagged_valid
+                simstatus_hit_eff[flag][hit] += flagged_eff
 
     hit_aliases = {
         "vtxd": "VTXD",
@@ -227,6 +232,25 @@ def main():
         fig.savefig(plot_save_dir / Path(f"part_{field}.png"))
 
     for flag in simstatus_flags:
+        for hit in hits:
+            total_hit_valid = simstatus_hit_valid[flag][hit]
+            total_hit_eff = simstatus_hit_eff[flag][hit]
+
+            hit_eff = total_hit_eff / total_hit_valid
+            hit_eff_errors = bayesian_binomial_error(total_hit_eff, total_hit_valid)
+
+            fig, ax = plt.subplots()
+            fig.set_size_inches(8, 3)
+
+            plot_hist_to_ax(ax, hit_eff, pt_bins, hit_eff_errors)
+            ax.set_xlabel("$p_T$ [GeV]")
+            ax.set_ylabel(f"{hit.upper()} Hit Eff. for MC {flag}")
+            ax.set_xscale("log")
+            ax.set_ylim(0.0, 1.1)
+            ax.grid(alpha=0.25, linestyle="--")
+
+            fig.savefig(plot_save_dir / f"{flag}_eff_{hit}_vs_pt.png")
+
         total_valid = simstatus_total_valid[flag]
         total_eff = simstatus_total_eff[flag]
 
