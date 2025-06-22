@@ -2,7 +2,6 @@ from pathlib import Path
 
 import h5py
 from lightning import Callback, LightningModule, Trainer
-from torch import Tensor
 
 from hepattn.utils.tensor_utils import tensor_to_numpy
 
@@ -37,12 +36,9 @@ class PredictionWriter(Callback):
         self.trainer = trainer
         self.dataset = trainer.datamodule.test_dataloader().dataset
 
-        # Open the handle for writing to the file
-        # self.file = h5py.File(self.output_path, "w")
-
     @property
     def output_path(self) -> Path:
-        # The output dataset will be saved in the same directory as the checkpoint
+        # The output dataset will be saved in the same direcory as the checkpoint
         out_dir = Path(self.trainer.ckpt_path).parent
         out_basename = str(Path(self.trainer.ckpt_path).stem)
         split = Path(self.dataset.dirpath).name
@@ -56,48 +52,34 @@ class PredictionWriter(Callback):
         inputs, targets = batch
         outputs, preds, losses = test_step_outputs
 
-        # handle batched case
-        if "sample_id" in targets:
-            # Get all of the sample IDs in the batch, this is what will be used to retrieve the samples
-            sample_ids = targets["sample_id"]
+        # Get all of the sample IDs in the batch, this is what will be used to retrieve the samples
+        sample_ids = targets["sample_id"]
 
-            # Iterate through all of the samples in the batch
-            for idx, sample_id in enumerate(sample_ids):
-                self.write_sample(sample_id, inputs, targets, outputs, preds, losses, idx)
+        # Iterate through all of the samples in the batch
+        for idx in range(len(sample_ids)):
+            sample_id = str(sample_ids[idx].item())
+            sample_group = self.file.create_group(sample_id)
 
-        # handle unbatched case
-        else:
-            self.write_sample(batch_idx, inputs, targets, outputs, preds, losses, 0)
+            # Write inputs and targets
+            if self.write_inputs:
+                self.write_items(sample_group, "inputs", inputs, idx)
 
-    def write_sample(self, sample_id, inputs, targets, outputs, preds, losses, idx):
-        """
-        Write a single sample to the output file.
-        """
-        # create a group for thie sample_id
-        if isinstance(sample_id, Tensor):
-            sample_id = sample_id.item()
-        sample_group = self.file.create_group(str(sample_id))
+            if self.write_targets:
+                self.write_items(sample_group, "targets", targets, idx)
 
-        # Write inputs and targets
-        if self.write_inputs:
-            self.write_items(sample_group, "inputs", inputs, idx)
+            # Items produced by model have layer/task structure
+            if self.write_outputs:
+                self.write_layer_task_items(sample_group, "outputs", outputs, idx)
 
-        if self.write_targets:
-            self.write_items(sample_group, "targets", targets, idx)
+            if self.write_preds:
+                self.write_layer_task_items(sample_group, "preds", preds, idx)
 
-        # Items produced by model have layer/task structure
-        if self.write_outputs:
-            self.write_layer_task_items(sample_group, "outputs", outputs, idx)
-
-        if self.write_preds:
-            self.write_layer_task_items(sample_group, "preds", preds, idx)
-
-        if self.write_losses:
-            self.write_layer_task_items(sample_group, "losses", losses, idx)
+            if self.write_losses:
+                self.write_layer_task_items(sample_group, "losses", losses, idx)
 
     def write_items(self, sample_group, item_name, items, idx):
         # This will write out a dict of items that has the structure
-        # sample/item/value, e.g.
+        # sample/item/layer/task/value, e.g.
         # sample_id/inputs/pixel_x
         items_group = sample_group.create_group(item_name)
         for name, value in items.items():
@@ -118,17 +100,14 @@ class PredictionWriter(Callback):
                 for name, value in task_items.items():
                     self.create_dataset(task_group, name, value[idx][None, ...])
 
+    def on_test_epoch_end(self, trainer, module):
+        # Close the file handle now we are done
+        self.file.close()
+        print("Created output file", self.output_path)
+
     def create_dataset(self, group, name, value):
         # Shouldn't need to detach as we are testing
         value = tensor_to_numpy(value)
 
         # Write the data to the file
         group.create_dataset(name, data=value, compression="lzf")
-
-    def teardown(self, trainer, module, stage):
-        # Close the file handle now we are done
-        if stage == "test":
-            self.file.close()
-            print("-" * 80)
-            print("Created output file", self.output_path)
-            print("-" * 80)

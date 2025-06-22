@@ -1,4 +1,4 @@
-name: CLD_5_256_charged_10MeV_single3d_simflag_F16
+name: CLD_5_320_charged_10MeV_noise_neutrals_F16_simflag_focal
 
 data:
   # Paths to preprocessed data directories
@@ -20,7 +20,7 @@ data:
   particle_min_pt: 0.01
 
   # Number of query slots / particles to generate per event
-  event_max_num_particles: &num_particles 256
+  event_max_num_particles: &num_particles 320
 
   # Charged particle cuts based on hit content
   charged_particle_min_num_hits:
@@ -46,14 +46,14 @@ data:
   # Cuts on maximum deflection between subsequent hits
   particle_hit_deflection_cuts:
     vtxd:
-      max_angle: -1
-      max_angle_xy: 0.25
-      max_angle_rz: 0.25
+      max_angle: 0.25
+      max_angle_xy: -1
+      max_angle_rz: -1
       num_passes: 8
     trkr:
-      max_angle: -1
-      max_angle_xy: 1.25
-      max_angle_rz: 0.175
+      max_angle: 1.0
+      max_angle_xy: -1
+      max_angle_rz: -1
       num_passes: 16
 
   # Cuts on maximum distance between subsequent hit
@@ -305,7 +305,9 @@ trainer:
   logger:
     class_path: lightning.pytorch.loggers.CometLogger
     init_args:
-      project_name: cld
+      api_key: PcMdYSuDnX6qCEVHiQki4h4YL
+      workspace: sunnyw22
+      project_name: hepattn
 
   callbacks:
     - class_path: hepattn.callbacks.InferenceTimer
@@ -560,12 +562,12 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 10.0
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 1.0
                 costs:
                   mask_ce: 10.0
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 1.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -578,12 +580,12 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 10.0
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 1.0
                 costs:
                   mask_ce: 10.0
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 1.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -597,12 +599,12 @@ model:
                 target_field: energy_frac
                 losses:
                   mask_ce: 0.5
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 0.1
                 costs:
                   mask_ce: 0.5
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 0.1
                 dim: *dim
                 null_weight: 1.0
 
@@ -616,12 +618,12 @@ model:
                 target_field: energy_frac
                 losses:
                   mask_ce: 0.5
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 0.1
                 costs:
                   mask_ce: 0.5
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 0.1
                 dim: *dim
                 null_weight: 1.0
 
@@ -634,12 +636,12 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 1.0
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 0.5
                 costs:
                   mask_ce: 1.0
-                  mask_dice: 0.0
-                  mask_focal: 0.0
+                  # mask_dice: 0.0
+                  mask_focal: 0.5
                 dim: *dim
                 null_weight: 1.0
 

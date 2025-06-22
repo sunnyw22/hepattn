@@ -14,7 +14,7 @@ def solve_scipy(cost):
 
 
 def solve_1015_early(cost):
-    return lap1015.lap_late(cost)
+    return lap1015.lap_early(cost)
 
 
 def solve_1015_late(cost):

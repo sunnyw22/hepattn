@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:a100:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=40G
+#SBATCH --mem=80G
 #SBATCH --output=/home/syw24/ftag/hepattn/src/hepattn/experiments/cld/slurm_logs/slurm-%j.%x.out
 
 
@@ -33,15 +33,14 @@ echo "Moved dir, now in: ${PWD}"
 # Set tmpdir
 export TMPDIR=/home/syw24/tmp
 
-# Run the training
+# Run the trainingxi
 echo "Running training script..."
 
 # Python command that will be run
-# CONFIG_PATH="/home/syw24/ftag/hepattn/src/hepattn/experiments/cld/configs/base.yaml"
-CONFIG_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/config.yaml"
-CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=002-train_loss=2.91483.ckpt"
-# PYTORCH_CMD="python src/hepattn/experiments/cld/main.py fit --config $CONFIG_PATH"
-PYTORCH_CMD="python src/hepattn/experiments/cld/main.py test --config $CONFIG_PATH --ckpt_path $CKPT_PATH"
+CONFIG_PATH="/home/syw24/ftag/hepattn/src/hepattn/experiments/cld/configs/base.yaml"
+# CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=002-train_loss=2.91483.ckpt"
+PYTORCH_CMD="python src/hepattn/experiments/cld/main.py fit --config $CONFIG_PATH"
+# PYTORCH_CMD="python src/hepattn/experiments/cld/main.py test --config $CONFIG_PATH --ckpt_path $CKPT_PATH"
 
 # Pixi commnand that runs the python command inside the pixi env
 PIXI_CMD="pixi run $PYTORCH_CMD"
