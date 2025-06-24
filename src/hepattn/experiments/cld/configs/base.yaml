@@ -562,12 +562,12 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 10.0
-                  # mask_dice: 0.0
-                  mask_focal: 1.0
+                  mask_dice: 2.0
+                  mask_focal: 4.0
                 costs:
                   mask_ce: 10.0
-                  # mask_dice: 0.0
-                  mask_focal: 1.0
+                  mask_dice: 2.0
+                  mask_focal: 4.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -580,12 +580,12 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 10.0
-                  # mask_dice: 0.0
-                  mask_focal: 1.0
+                  mask_dice: 2.0
+                  mask_focal: 4.0
                 costs:
                   mask_ce: 10.0
-                  # mask_dice: 0.0
-                  mask_focal: 1.0
+                  mask_dice: 2.0
+                  mask_focal: 4.0
                 dim: *dim
                 null_weight: 1.0
 
@@ -599,12 +599,12 @@ model:
                 target_field: energy_frac
                 losses:
                   mask_ce: 0.5
-                  # mask_dice: 0.0
-                  mask_focal: 0.1
+                  mask_dice: 0.1
+                  mask_focal: 0.2
                 costs:
                   mask_ce: 0.5
-                  # mask_dice: 0.0
-                  mask_focal: 0.1
+                  mask_dice: 0.1
+                  mask_focal: 0.2
                 dim: *dim
                 null_weight: 1.0
 
@@ -618,12 +618,12 @@ model:
                 target_field: energy_frac
                 losses:
                   mask_ce: 0.5
-                  # mask_dice: 0.0
-                  mask_focal: 0.1
+                  mask_dice: 0.1
+                  mask_focal: 0.2
                 costs:
                   mask_ce: 0.5
-                  # mask_dice: 0.0
-                  mask_focal: 0.1
+                  mask_dice: 0.1
+                  mask_focal: 0.2
                 dim: *dim
                 null_weight: 1.0
 
@@ -636,39 +636,39 @@ model:
                 target_object: particle
                 losses:
                   mask_ce: 1.0
-                  # mask_dice: 0.0
-                  mask_focal: 0.5
+                  mask_dice: 1.0
+                  mask_focal: 1.0
                 costs:
                   mask_ce: 1.0
-                  # mask_dice: 0.0
-                  mask_focal: 0.5
+                  mask_dice: 1.0
+                  mask_focal: 1.0
                 dim: *dim
                 null_weight: 1.0
 
-            - class_path: hepattn.models.task.ClassificationTask
-              init_args:
-                name: flow_simstatus_assignment
-                input_object: query
-                output_object: flow
-                target_object: particle
-                classes:
-                  - isOverlay
-                  - isStopped
-                  - LD
-                  - DIC
-                  - DIT
-                  - VNEP
-                  - BS
-                  - CIS
-                dim: *dim
-                class_weights:
-                  isOverlay: 0
-                  isStopped: 0.11
-                  LD: 19.9
-                  DIC: 0.12
-                  DIT: 1.21
-                  VNEP: 0.68
-                  BS: 33.4
-                  CIS: 0.51
-                loss_weight: 1.0
-                multilabel: True
+            # - class_path: hepattn.models.task.ClassificationTask
+            #   init_args:
+            #     name: flow_simstatus_assignment
+            #     input_object: query
+            #     output_object: flow
+            #     target_object: particle
+            #     classes:
+            #       - isOverlay
+            #       - isStopped
+            #       - LD
+            #       - DIC
+            #       - DIT
+            #       - VNEP
+            #       - BS
+            #       - CIS
+            #     dim: *dim
+            #     class_weights:
+            #       isOverlay: 0
+            #       isStopped: 0.11
+            #       LD: 19.9
+            #       DIC: 0.12
+            #       DIT: 1.21
+            #       VNEP: 0.68
+            #       BS: 33.4
+            #       CIS: 0.51
+            #     loss_weight: 0.1
+            #     multilabel: True
