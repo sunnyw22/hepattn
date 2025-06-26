@@ -19,7 +19,6 @@ class MaskFormer(nn.Module):
         use_attn_masks: bool = True,
         use_query_masks: bool = True,
         raw_variables: list[str] | None = None,
-        intermediate_losses: bool = True,
     ):
         """
         Initializes the MaskFormer model, which is a modular transformer-style architecture designed
@@ -51,8 +50,6 @@ class MaskFormer(nn.Module):
             If True, query masks will be used to control which queries are valid during attention.
         raw_variables : list[str] or None, optional
             A list of variable names that passed to tasks without embedding.
-        intermediate_losses : bool, optional
-            If True, intermediate losses will be applied at each decoder layer.
         """
         super().__init__()
         self.input_nets = input_nets
@@ -66,7 +63,6 @@ class MaskFormer(nn.Module):
         self.use_attn_masks = use_attn_masks
         self.use_query_masks = use_query_masks
         self.raw_variables = raw_variables or []
-        self.intermediate_losses = intermediate_losses
 
     def forward(self, inputs: dict[str, Tensor]) -> dict[str, Tensor]:
         # Atomic input names
@@ -241,12 +237,14 @@ class MaskFormer(nn.Module):
         costs = {}
         batch_idxs = torch.arange(targets["particle_valid"].shape[0]).unsqueeze(1)
         for layer_name, layer_outputs in outputs.items():
-            if not self.intermediate_losses and layer_name != "final":
-                continue
-
             layer_costs = None
+
             # Get the cost contribution from each of the tasks
             for task in self.tasks:
+                # Skip tasks that do not contribute intermediate losses
+                if layer_name != "final" and not task.has_intermediate_loss:
+                    continue
+
                 # Only use the cost from the final set of predictions
                 task_costs = task.cost(layer_outputs[task.name], targets)
 
@@ -261,10 +259,7 @@ class MaskFormer(nn.Module):
 
         batch_idxs = torch.arange(targets["particle_valid"].shape[0]).unsqueeze(1)
         # Permute the outputs for each output in each layer
-        for layer_name in outputs:
-            if not self.intermediate_losses and layer_name != "final":
-                continue
-
+        for layer_name in costs:
             # Get the indicies that can permute the predictions to yield their optimal matching
             pred_idxs = self.matcher(costs[layer_name], targets["particle_valid"])
 
@@ -276,8 +271,6 @@ class MaskFormer(nn.Module):
         # Compute the losses for each task in each block
         losses = {}
         for layer_name in outputs:
-            if not self.intermediate_losses and layer_name != "final":
-                continue
             losses[layer_name] = {}
             for task in self.tasks:
                 losses[layer_name][task.name] = task.loss(outputs[layer_name], targets)

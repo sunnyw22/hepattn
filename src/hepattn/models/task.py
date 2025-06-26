@@ -9,13 +9,11 @@ from hepattn.models.loss import cost_fns, focal_loss, loss_fns
 from hepattn.utils.masks import topk_attn
 from hepattn.utils.scaling import FeatureScaler
 
-# Pick a value that is safe for float16
-COST_PAD_VALUE = 1e4
-
 
 class Task(nn.Module, ABC):
     def __init__(self):
         super().__init__()
+        self.has_intermediate_loss = False
 
     @abstractmethod
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
@@ -112,8 +110,6 @@ class ObjectValidTask(Task):
         costs = {}
         for cost_fn, cost_weight in self.costs.items():
             costs[cost_fn] = cost_weight * cost_fns[cost_fn](output, target)
-            # Set the costs of invalid objects to be (basically) inf
-            costs[cost_fn][~targets[self.target_object + "_valid"].unsqueeze(-2).expand_as(costs[cost_fn])] = COST_PAD_VALUE
         return costs
 
     def loss(self, outputs, targets):
@@ -226,6 +222,7 @@ class ObjectHitMaskTask(Task):
         self.mask_attn = mask_attn
         self.logit_scale = logit_scale
         self.pred_threshold = pred_threshold
+        self.has_intermediate_loss = mask_attn
 
         self.output_object_hit = output_object + "_" + input_hit
         self.target_object_hit = target_object + "_" + input_hit
@@ -272,9 +269,6 @@ class ObjectHitMaskTask(Task):
         costs = {}
         for cost_fn, cost_weight in self.costs.items():
             costs[cost_fn] = cost_weight * cost_fns[cost_fn](output, target)
-
-            # Set the costs of invalid objects to be (basically) inf
-            costs[cost_fn][~targets[self.target_object + "_valid"].unsqueeze(-2).expand_as(costs[cost_fn])] = COST_PAD_VALUE
         return costs
 
     def loss(self, outputs, targets):
@@ -518,8 +512,6 @@ class ObjectClassificationTask(Task):
         costs = {}
         for cost_fn, cost_weight in self.costs.items():
             costs[cost_fn] = cost_weight * cost_fns[cost_fn](output, target)
-            # Set the costs of invalid objects to be (basically) inf
-            costs[cost_fn][~targets[self.target_object + "_valid"].unsqueeze(-2).expand_as(costs[cost_fn])] = COST_PAD_VALUE
         return costs
 
     def loss(self, outputs, targets):
@@ -585,9 +577,6 @@ class IncidenceRegressionTask(Task):
         costs = {}
         for cost_fn, cost_weight in self.costs.items():
             costs[cost_fn] = cost_weight * cost_fns[cost_fn](output, target)
-
-            # Set the costs of invalid objects to be (basically) inf
-            costs[cost_fn][~targets[self.target_object + "_valid"].unsqueeze(-2).expand_as(costs[cost_fn])] = COST_PAD_VALUE
         return costs
 
     def loss(self, outputs: dict[str, Tensor], targets: dict[str, Tensor]) -> dict[str, Tensor]:
@@ -711,8 +700,6 @@ class IncidenceBasedRegressionTask(RegressionTask):
 
         # Compute the cost as the sum of the squared differences
         cost = self.cost_weight * torch.sqrt(dphi**2 + deta**2)
-        cost[~targets[self.target_object + "_valid"].unsqueeze(-2).expand_as(cost)] = COST_PAD_VALUE
-
         return {"regression": cost}
 
     def loss(self, outputs, targets):
