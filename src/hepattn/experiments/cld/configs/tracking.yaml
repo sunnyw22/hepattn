@@ -1,4 +1,4 @@
-name: CLD_TRKECALHCAL_16_96_TF_charged_10MeV_F16_manypass
+name: CLD_TRKECALHCAL_16_128_TF_charged_10MeV_F16_manypass
 
 data:
   # Paths to preprocessed data directories
@@ -20,17 +20,23 @@ data:
   particle_min_pt: 0.01
 
   # Number of query slots / particles to generate per event
-  event_max_num_particles: &num_particles 96
+  event_max_num_particles: &num_particles 200
 
   # Charged particle cuts based on hit content
   charged_particle_min_num_hits:
-    vtxd: 4
-    trkr: 4
+    vtxd: 0
+    trkr: 0
+    sihit: 4
 
-  # Neutral particle cuts based on hit content
+  # Charged particle cuts based on hit content
   charged_particle_max_num_hits:
     vtxd: 12
     trkr: 12
+    sihit: 24
+
+  particle_cut_veto_min_num_hits:
+    ecal: 32
+    hcal: 16
 
   # Cuts on minimum fraction of particle pT a hit should have
   particle_hit_min_p_ratio:
@@ -41,9 +47,13 @@ data:
   particle_hit_deflection_cuts:
     vtxd:
       max_angle: 0.25
+      max_angle_xy: -1
+      max_angle_rz: -1
       num_passes: 8
     trkr:
       max_angle: 1.0
+      max_angle_xy: -1
+      max_angle_rz: -1
       num_passes: 16
 
   # Cuts on maximum distance between subsequent hit
@@ -72,6 +82,14 @@ data:
       - vte
 
     trkr:
+      - itb
+      - ite
+      - otb
+      - ote
+
+    sihit:
+      - vtb
+      - vte
       - itb
       - ite
       - otb
@@ -136,6 +154,9 @@ data:
       - v.b
       - du
       - dv
+
+    sihit:
+      - type
 
     ecal:
       - type
@@ -217,6 +238,15 @@ data:
       - num_trkr
       - num_ecal
       - num_hcal
+      - isolation
+      - isOverlay
+      - isStopped
+      - LD
+      - DIC
+      - DIT
+      - VNEP
+      - BS
+      - CIS
 
     particle_vtxd:
       - pos.x
@@ -236,9 +266,11 @@ data:
 
     particle_ecal:
       - energy
+      - energy_frac
 
     particle_hcal:
       - energy
+      - energy_frac
 
     particle_muon:
       - energy
@@ -286,7 +318,7 @@ model:
 
   lrs_config:
     initial: 1e-5
-    max: 2e-5
+    max: 5e-5
     end: 1e-5
     pct_start: 0.01
     skip_scheduler: false
@@ -300,7 +332,6 @@ model:
       dim: &dim 256
       num_queries: *num_particles
       input_sort_field: pos.phi
-      record_intermediate_embeddings: false
       use_attn_masks: true
       use_query_masks: false
 
@@ -512,6 +543,7 @@ model:
                 input_object: query
                 output_object: flow
                 target_object: particle
+                target_field: energy_frac
                 losses:
                   mask_ce: 0.5
                 costs:
@@ -526,6 +558,7 @@ model:
                 input_object: query
                 output_object: flow
                 target_object: particle
+                target_field: energy_frac
                 losses:
                   mask_ce: 0.5
                 costs:

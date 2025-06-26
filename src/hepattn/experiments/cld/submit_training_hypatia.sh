@@ -31,13 +31,13 @@ cd /home/syw24/ftag/hepattn
 echo "Moved dir, now in: ${PWD}"
 
 # Set tmpdir
-export TMPDIR=/home/syw24/tmp
+export TMPDIR=/share/gpu1/syw24/tmp
 
 # Run the trainingxi
 echo "Running training script..."
 
 # Python command that will be run
-CONFIG_PATH="/home/syw24/ftag/hepattn/src/hepattn/experiments/cld/configs/base.yaml"
+CONFIG_PATH="/home/syw24/ftag/hepattn/src/hepattn/experiments/cld/configs/tracking.yaml"
 # CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLD_5_96_charged_10MeV_single3d_simflag_F16_20250618-T041315/ckpts/epoch=002-train_loss=2.91483.ckpt"
 PYTORCH_CMD="python src/hepattn/experiments/cld/main.py fit --config $CONFIG_PATH"
 # PYTORCH_CMD="python src/hepattn/experiments/cld/main.py test --config $CONFIG_PATH --ckpt_path $CKPT_PATH"
@@ -46,7 +46,7 @@ PYTORCH_CMD="python src/hepattn/experiments/cld/main.py fit --config $CONFIG_PAT
 PIXI_CMD="pixi run $PYTORCH_CMD"
 
 # Apptainer command that runs the pixi command inside the pixi apptainer image
-APPTAINER_CMD="apptainer run --nv --bind /home/syw24 --bind /share/rcifdata/maxhart /home/syw24/ftag/hepattn/pixi.sif $PIXI_CMD"
+APPTAINER_CMD="apptainer run --nv --bind /home/syw24 --bind /share/gpu1/syw24 --bind /share/rcifdata/maxhart /home/syw24/ftag/hepattn/pixi.sif $PIXI_CMD"
 
 # Run the final command
 echo "Running command: $APPTAINER_CMD"

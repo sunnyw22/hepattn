@@ -247,14 +247,14 @@ data:
       - energy_hcal
       - calib_energy_ecal
       - calib_energy_hcal
-      - isOverlay
-      - isStopped
-      - LD
-      - DIC
-      - DIT
-      - VNEP
-      - BS
-      - CIS
+      # - isOverlay
+      # - isStopped
+      # - LD
+      # - DIC
+      # - DIT
+      # - VNEP
+      # - BS
+      # - CIS
 
     particle_vtxd:
       - pos.x
@@ -305,9 +305,7 @@ trainer:
   logger:
     class_path: lightning.pytorch.loggers.CometLogger
     init_args:
-      api_key: PcMdYSuDnX6qCEVHiQki4h4YL
-      workspace: sunnyw22
-      project_name: hepattn
+      project_name: cld
 
   callbacks:
     - class_path: hepattn.callbacks.InferenceTimer
