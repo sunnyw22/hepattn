@@ -4,12 +4,11 @@
 #SBATCH -p GPU
 #SBATCH --nodes=1
 #SBATCH --export=ALL
-#SBATCH --gres=gpu:a100:1
-#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:a100:4
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=40G
-#SBATCH --output=/home/syw24/ftag/hepattn/src/hepattn/experiments/clic/slurm_logs/slurm-%j.%x.out
-
+#SBATCH --output=/share/gpu1/syw24/hepattn/src/hepattn/experiments/clic/slurm_logs/slurm-%j.%x.out
 
 # Comet variables
 echo "Setting comet experiment key"
@@ -27,26 +26,46 @@ echo "nvidia-smi:"
 nvidia-smi
 
 # Move to workdir
-cd /home/syw24/ftag/hepattn
+cd /share/gpu1/syw24/hepattn
 echo "Moved dir, now in: ${PWD}"
 
 # Set tmpdir
-export TMPDIR=/home/syw24/tmp
+export TMPDIR=/share/gpu1/syw24/tmp
 
 # Run the training
 echo "Running training script..."
 
 # Python command that will be run
-CONFIG_PATH="/home/syw24/ftag/hepattn/src/hepattn/experiments/clic/configs/base.yaml"
-# CKPT_PATH="/home/syw24/ftag/hepattn/logs/CLIC_Pflow_FullDiceFocFix_20250621-T002933/ckpts/epoch=075-val_loss=0.97786.ckpt"
-# PYTORCH_CMD="python src/hepattn/experiments/clic/main.py test --config $CONFIG_PATH --ckpt_path $CKPT_PATH"
+CONFIG_PATH="/share/gpu1/syw24/hepattn/src/hepattn/experiments/clic/configs/base.yaml"
+# PYTORCH_CMD="python src/hepattn/experiments/clic/main.py fit --config $CONFIG_PATH"
 PYTORCH_CMD="python src/hepattn/experiments/clic/main.py fit --config $CONFIG_PATH"
+
+# CONFIG_PATH="/share/gpu1/syw24/hepattn/logs/CLIC_Pflow_FullDiceFocFix_BF16_B64_20250625-T144653/config.yaml"
+# CKPT_PATH="/share/gpu1/syw24/hepattn/logs/CLIC_Pflow_FullDiceFocFix_BF16_B64_20250625-T144653/ckpts/epoch=046-val_loss=1.07280.ckpt"
+# PYTORCH_CMD="python src/hepattn/experiments/clic/main.py test --config $CONFIG_PATH --ckpt_path $CKPT_PATH"
+
+# Setting up for multiple gpus training
+export MASTER_ADDR=$(hostname -f)
+export MASTER_PORT=$((12000 + RANDOM % 1000))
+export PYTORCH_DISTRIBUTED_BACKEND=nccl
+export NCCL_IB_DISABLE=1
+export NCCL_SOCKET_IFNAME=$(ip route get 8.8.8.8 | awk '{print $5}')
+export GLOO_SOCKET_IFNAME=$NCCL_SOCKET_IFNAME
+export PYTORCH_DIST_DEBUG=INFO
+export TORCH_DISTRIBUTED_DEBUG=INFO
+# export NCCL_P2P_DISABLE=1
+
+echo "MASTER_ADDR=$MASTER_ADDR"
+echo "MASTER_PORT=$MASTER_PORT"
+echo "NCCL_SOCKET_IFNAME=$NCCL_SOCKET_IFNAME"
+echo "GLOO_SOCKET_IFNAME=$GLOO_SOCKET_IFNAME"
 
 # Pixi commnand that runs the python command inside the pixi env
 PIXI_CMD="pixi run $PYTORCH_CMD"
 
 # Apptainer command that runs the pixi command inside the pixi apptainer image
-APPTAINER_CMD="apptainer run --nv --bind /share/gpu1/syw24 --bind /home/syw24 /home/syw24/ftag/hepattn/pixi.sif $PIXI_CMD"
+# Add srun in front of apptainer command for multiple gpus training
+APPTAINER_CMD="srun apptainer run --nv --home /share/gpu1/syw24 /share/gpu1/syw24/hepattn/pixi.sif $PIXI_CMD"
 
 # Run the final command
 echo "Running command: $APPTAINER_CMD"

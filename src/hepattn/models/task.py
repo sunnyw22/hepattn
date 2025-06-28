@@ -263,7 +263,7 @@ class ObjectHitMaskTask(Task):
         return {self.output_object_hit + "_valid": outputs[self.output_object_hit + "_logit"].detach().sigmoid() >= self.pred_threshold}
 
     def cost(self, outputs, targets):
-        output = outputs[self.output_object_hit + "_logit"].detach()
+        output = outputs[self.output_object_hit + "_logit"].detach().to(torch.float32)
         target = targets[self.target_object_hit + "_valid"].detach().to(output.dtype)
 
         costs = {}
