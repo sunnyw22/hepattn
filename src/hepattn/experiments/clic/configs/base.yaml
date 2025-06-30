@@ -1,4 +1,4 @@
-name: CLIC_Pflow_FullDiceFocFix_bf16_mixed_4gpu
+name: CLIC_Pflow_FullDiceFocFix_bf16_mixed_1gpu_Fin
 seed_everything: 42
 
 data:
@@ -41,9 +41,9 @@ data:
 trainer:
   gradient_clip_val: 0.1
   max_epochs: 200
-  strategy: ddp
+  # strategy: ddp
   accelerator: gpu
-  devices: 4
+  devices: 1
   precision: bf16-mixed
   default_root_dir: logs
   enable_progress_bar: True
@@ -128,7 +128,7 @@ model:
             num_heads: 16
 
       num_decoder_layers: 4
-      intermediate_losses: false
+      # has_intermediate_loss: false
       decoder_layer_config:
         dim: *dim
         mask_attention: true
@@ -157,6 +157,7 @@ model:
                   object_ce: 2
                 costs:
                   object_ce: 2
+                has_intermediate_loss: True
                 net:
                   class_path: hepattn.models.Dense
                   init_args:
@@ -185,6 +186,7 @@ model:
                   mask_bce: 5.0
                   mask_dice: 1.0
                   mask_focal: 2.0
+                has_intermediate_loss: True
                 dim: *dim
                 null_weight: 1.0
 

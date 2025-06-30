@@ -285,8 +285,8 @@ def regr_smooth_l1_costs(pred, true):
 
 
 cost_fns = {
-    "object_bce": object_bce_cost,
-    "object_ce": object_ce_cost,
+    "object_bce": object_bce_costs,
+    "object_ce": object_ce_costs,
     "mask_bce": mask_bce_costs,
     "mask_dice": mask_dice_costs,
     "mask_focal": mask_focal_costs,

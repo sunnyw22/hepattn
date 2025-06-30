@@ -11,9 +11,9 @@ from hepattn.utils.scaling import FeatureScaler
 
 
 class Task(nn.Module, ABC):
-    def __init__(self):
+    def __init__(self, has_intermediate_loss: bool = False):
         super().__init__()
-        self.has_intermediate_loss = False
+        self.has_intermediate_loss = has_intermediate_loss
 
     @abstractmethod
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
@@ -207,8 +207,9 @@ class ObjectHitMaskTask(Task):
         mask_attn: bool = True,
         logit_scale: float = 1.0,
         pred_threshold: float = 0.5,
+        has_intermediate_loss: bool = False,
     ):
-        super().__init__()
+        super().__init__(has_intermediate_loss=has_intermediate_loss)
 
         self.name = name
         self.input_hit = input_hit
@@ -222,7 +223,7 @@ class ObjectHitMaskTask(Task):
         self.mask_attn = mask_attn
         self.logit_scale = logit_scale
         self.pred_threshold = pred_threshold
-        self.has_intermediate_loss = mask_attn
+        # self.has_intermediate_loss = mask_attn
 
         self.output_object_hit = output_object + "_" + input_hit
         self.target_object_hit = target_object + "_" + input_hit
@@ -236,6 +237,7 @@ class ObjectHitMaskTask(Task):
         # Produce new task-specific embeddings for the hits and objects
         x_object = self.object_net(x[self.input_object + "_embed"])
         x_hit = self.hit_net(x[self.input_hit + "_embed"])
+        # x_hit = x[self.input_hit + "_embed"]
 
         # Object-hit probability is the dot product between the hit and object embedding
         object_hit_logit = self.logit_scale * torch.einsum("bnc,bmc->bnm", x_object, x_hit)
@@ -443,6 +445,7 @@ class ObjectClassificationTask(Task):
         loss_class_weights: list[float] | None = None,
         null_weight: float = 1.0,
         mask_queries: bool = False,
+        has_intermediate_loss: bool = False,
     ):
         """Task used for object classification.
 
@@ -468,7 +471,7 @@ class ObjectClassificationTask(Task):
             Weight applied to the null class in the loss. Useful if many instances of
             the target class are null, and we need to reweight to overcome class imbalance.
         """
-        super().__init__()
+        super().__init__(has_intermediate_loss=has_intermediate_loss)
 
         self.name = name
         self.input_object = input_object
@@ -497,7 +500,8 @@ class ObjectClassificationTask(Task):
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
         # Network projects the embedding down into a scalar
         x_class_prob = self.net(x[self.input_object + "_embed"])
-        return {self.output_object + "_class_prob": x_class_prob.squeeze(-1)}
+        # return {self.output_object + "_class_prob": x_class_prob.squeeze(-1)}
+        return {self.output_object + "_class_prob": x_class_prob}
 
     def predict(self, outputs):
         classes = outputs[self.output_object + "_class_prob"].detach().argmax(-1)
