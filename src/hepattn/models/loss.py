@@ -35,6 +35,11 @@ def object_bce_cost(pred_logits, targets):
     return -probs * targets - (1 - probs) * (1 - targets)
 
 
+def object_ce_loss(pred_probs, true, mask=None, weight=None):  # noqa: ARG001
+    losses = F.cross_entropy(pred_probs.flatten(0, 1), true.flatten(0, 1), weight=weight)
+    return losses.mean()
+
+
 def object_ce_cost(pred_logits, targets):
     """
     Compute batched multiclass object classification cost for object matching.
@@ -85,11 +90,6 @@ def mask_dice_loss(pred_logits, targets, object_valid_mask=None, input_pad_mask=
     denominator = probs.sum(-1) + targets.sum(-1)
     loss = 1 - (numerator + 1) / (denominator + 1)
     return loss.mean()
-
-
-def object_ce_loss(pred_probs, true, mask=None, weight=None):  # noqa: ARG001
-    losses = F.cross_entropy(pred_probs.flatten(0, 1), true.flatten(0, 1), weight=weight)
-    return losses.mean()
 
 
 def mask_dice_cost(pred_logits, targets, input_pad_mask=None, sample_weight=None):

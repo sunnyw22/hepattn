@@ -11,9 +11,9 @@ from hepattn.utils.scaling import FeatureScaler
 
 
 class Task(nn.Module, ABC):
-    def __init__(self, has_intermediate_loss: bool = False):
+    def __init__(self):
         super().__init__()
-        self.has_intermediate_loss = has_intermediate_loss
+        self.has_intermediate_loss = False
 
     @abstractmethod
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
@@ -204,9 +204,8 @@ class ObjectHitMaskTask(Task):
         mask_attn: bool = True,
         logit_scale: float = 1.0,
         pred_threshold: float = 0.5,
-        has_intermediate_loss: bool = False,
     ):
-        super().__init__(has_intermediate_loss=has_intermediate_loss)
+        super().__init__()
 
         self.name = name
         self.input_hit = input_hit
@@ -220,21 +219,19 @@ class ObjectHitMaskTask(Task):
         self.mask_attn = mask_attn
         self.logit_scale = logit_scale
         self.pred_threshold = pred_threshold
-        # self.has_intermediate_loss = mask_attn
+        self.has_intermediate_loss = mask_attn
 
         self.output_object_hit = output_object + "_" + input_hit
         self.target_object_hit = target_object + "_" + input_hit
         self.inputs = [input_object + "_embed", input_hit + "_embed"]
         self.outputs = [self.output_object_hit + "_logit"]
         self.hit_net = Dense(dim, dim)
-        # self.hit_net = nn.Identity()
         self.object_net = Dense(dim, dim)
 
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
         # Produce new task-specific embeddings for the hits and objects
         x_object = self.object_net(x[self.input_object + "_embed"])
         x_hit = self.hit_net(x[self.input_hit + "_embed"])
-        # x_hit = x[self.input_hit + "_embed"]
 
         # Object-hit probability is the dot product between the hit and object embedding
         object_hit_logit = self.logit_scale * torch.einsum("bnc,bmc->bnm", x_object, x_hit)
@@ -252,8 +249,7 @@ class ObjectHitMaskTask(Task):
 
         # If the attn mask is completely padded for a given entry, unpad it - tested and is required (?)
         # TODO: See if the query masking stops this from being necessary
-        # WHY?
-        # attn_mask[torch.where(torch.all(attn_mask, dim=-1))] = False
+        attn_mask[torch.where(torch.all(attn_mask, dim=-1))] = False
 
         return {self.input_hit: attn_mask}
 
@@ -275,18 +271,10 @@ class ObjectHitMaskTask(Task):
         output = outputs[self.name][self.output_object_hit + "_logit"]
         target = targets[self.target_object_hit + "_valid"].type_as(output)
 
-        # Build a padding mask for object-hit pairs
-        # hit_pad = targets[self.input_hit + "_valid"].unsqueeze(-2).expand_as(target)
-        # object_pad = targets[self.target_object + "_valid"].unsqueeze(-1).expand_as(target)
         hit_pad = targets[self.input_hit + "_valid"]
         object_pad = targets[self.target_object + "_valid"]
-        # An object-hit is valid slot if both its object and hit are valid slots
-        # TODO: Maybe calling this a mask is confusing since true entries are
-        # object_hit_mask = object_pad & hit_pad
 
         sample_weight = target + self.null_weight * (1 - target)
-        # sample_weight = None
-
         losses = {}
         for loss_fn, loss_weight in self.losses.items():
             losses[loss_fn] = loss_weight * loss_fns[loss_fn](
@@ -443,7 +431,7 @@ class ObjectClassificationTask(Task):
         loss_class_weights: list[float] | None = None,
         null_weight: float = 1.0,
         mask_queries: bool = False,
-        has_intermediate_loss: bool = False,
+        inter_loss: bool = True,
     ):
         """Task used for object classification.
 
@@ -469,7 +457,7 @@ class ObjectClassificationTask(Task):
             Weight applied to the null class in the loss. Useful if many instances of
             the target class are null, and we need to reweight to overcome class imbalance.
         """
-        super().__init__(has_intermediate_loss=has_intermediate_loss)
+        super().__init__()
 
         self.name = name
         self.input_object = input_object
@@ -478,6 +466,7 @@ class ObjectClassificationTask(Task):
         self.losses = losses
         self.costs = costs
         self.num_classes = num_classes
+        self.has_intermediate_loss = inter_loss
 
         class_weights = torch.ones(self.num_classes + 1, dtype=torch.float32)
         if loss_class_weights is not None:
@@ -498,8 +487,7 @@ class ObjectClassificationTask(Task):
     def forward(self, x: dict[str, Tensor]) -> dict[str, Tensor]:
         # Network projects the embedding down into a scalar
         x_class_prob = self.net(x[self.input_object + "_embed"])
-        # return {self.output_object + "_class_prob": x_class_prob.squeeze(-1)}
-        return {self.output_object + "_class_prob": x_class_prob}
+        return {self.output_object + "_class_prob": x_class_prob.squeeze(-1)}
 
     def predict(self, outputs):
         classes = outputs[self.output_object + "_class_prob"].detach().argmax(-1)
