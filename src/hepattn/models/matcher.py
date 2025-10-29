@@ -11,6 +11,12 @@ from hepattn.utils.import_utils import check_import_safe
 
 
 def solve_scipy(cost):
+    if not np.isfinite(cost).all():
+        nan_count = np.isnan(cost).sum()
+        inf_count = np.isinf(cost).sum()
+        invalid_value_msg = f"Invalid entries in cost matrix: NaNs={nan_count}, Infs={inf_count}, shape={cost.shape}\n"
+        raise ValueError(invalid_value_msg)
+
     _, col_idx = scipy.optimize.linear_sum_assignment(cost)
     return col_idx
 

@@ -10,6 +10,17 @@ from torchjd import mtl_backward
 from torchjd.aggregation import UPGrad
 
 
+def gls_per_layer(layer_losses: dict[str, torch.Tensor], eps: float = 1e-8) -> torch.Tensor:
+    """Computes the geometric mean across the layer.
+
+    Parameters
+    ----------
+    layer_losses: Losses from the tasks in a layer (if available).
+    """
+    losses = torch.stack(list(layer_losses.values()))
+    return torch.exp(torch.log(losses + eps).mean())
+
+
 class ModelWrapper(LightningModule):
     def __init__(
         self,
@@ -17,6 +28,7 @@ class ModelWrapper(LightningModule):
         model: nn.Module,
         lrs_config: dict,
         optimizer: Literal["AdamW", "Lion"] = "AdamW",
+        loss_mode: Literal["wsum", "GLS"] = "wsum",
         mtl: bool = False,
     ):
         super().__init__()
@@ -29,6 +41,19 @@ class ModelWrapper(LightningModule):
         self.lrs_config = lrs_config
         self.mtl = mtl
 
+        loss_modes = ["wsum", "GLS"]
+        assert loss_mode in loss_modes, f"Allowed loss modes are {loss_modes}, but got {loss_mode}"
+        self.loss_mode = loss_mode
+        if loss_mode == "GLS":
+            for task in self.model.tasks:
+                if hasattr(task, "losses"):
+                    assert all(w == 1.0 for w in task.losses.values()), (
+                        f"GLS mode requires all loss weights = 1, but got {list(task.losses.values())} in {task.name}"
+                    )
+                elif hasattr(task, "loss_weight"):  # For IncidenceBasedRegressionTasks in CLIC
+                    assert task.loss_weight == 1.0, f"GLS mode requires loss weights=1, but got {task.loss_weight} in {task.name}"
+
+        # If we are doing multi-task-learning, optimisation step must be done manually
         if mtl:
             # Donated buffers can cause issues with graph retention needed for MTL
             functorch_config.donated_buffer = False
@@ -45,19 +70,31 @@ class ModelWrapper(LightningModule):
 
     def aggregate_losses(self, losses: dict[str, Tensor], stage: str | None = None) -> Tensor:
         device = next(self.model.parameters()).device
-        total_loss = torch.tensor(0.0, device=device)
+        # total_loss = torch.tensor(0.0, device=device)
+
+        # log loss per task
+        per_task_loss = {}
 
         for layer_name, layer_losses in losses.items():
             layer_loss = 0
-            for task_losses in layer_losses.values():
+            for task_name, task_losses in layer_losses.items():
+                task_layer_sum = torch.tensor(0.0, device=device)
+
                 for loss_value in task_losses.values():
-                    total_loss += loss_value
+                    task_layer_sum = task_layer_sum + loss_value
                     layer_loss += loss_value
+
+                if task_name not in per_task_loss:
+                    per_task_loss[task_name] = torch.tensor(0.0, device=device)
+
+                per_task_loss[task_name] = per_task_loss[task_name] + task_layer_sum
 
             # Log the total loss from the layer
             self.log(f"{stage}/{layer_name}_loss", layer_loss, sync_dist=True)
 
         # Log the total loss
+        total_loss = torch.stack(list(per_task_loss.values())).sum() if self.loss_mode == "wsum" else gls_per_layer(per_task_loss)
+
         self.log(f"{stage}/loss", total_loss, sync_dist=True)
         return total_loss
 

@@ -318,6 +318,8 @@ def mask_kl_div_cost(pred_logits, targets, input_pad_mask=None, sample_weight=No
     Returns:
         cost: [batch_size, num_objects, num_objects] - KL cost
     """
+    pred_logits = torch.clamp(pred_logits, -100, 100)
+
     if input_pad_mask is not None:
         pred_logits = pred_logits.masked_fill(~input_pad_mask.unsqueeze(1), float("-inf"))
         targets = targets * input_pad_mask.unsqueeze(1)

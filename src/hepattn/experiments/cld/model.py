@@ -11,9 +11,10 @@ class CLDReconstructor(ModelWrapper):
         model: nn.Module,
         lrs_config: dict,
         optimizer: str = "AdamW",
+        loss_mode: str = "wsum",
         mtl: bool = False,
     ):
-        super().__init__(name, model, lrs_config, optimizer, mtl)
+        super().__init__(name, model, lrs_config, optimizer, loss_mode, mtl)
 
     def log_custom_metrics(self, preds, targets, stage):
         # Just log predictions from the final layer

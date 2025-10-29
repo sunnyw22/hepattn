@@ -13,9 +13,10 @@ class MPflow(ModelWrapper):
         model: nn.Module,
         lrs_config: dict,
         optimizer: str = "AdamW",
+        loss_mode: str = "wsum",
         mtl: bool = False,
     ):
-        super().__init__(name, model, lrs_config, optimizer, mtl)
+        super().__init__(name, model, lrs_config, optimizer, loss_mode, mtl)
         self.MI = MaskInference
 
         self.obj_accuracy_micro = tm.classification.MulticlassAccuracy(num_classes=6, average="micro")
